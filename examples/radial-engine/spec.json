@@ -1,0 +1,291 @@
+{
+  "meta": {
+    "id": "radial-engine",
+    "org": "KESTREL AERO MOTORS",
+    "division": "Powerplant Division · Reciprocating Engines",
+    "title": "NINE-CYLINDER RADIAL · R-1340 \"KESTREL\"",
+    "subtitle": "General arrangement, valve gear & crank kinematics",
+    "archetype": "rotating-machine",
+    "units": "mm",
+    "projection": "FIRST ANGLE",
+    "tolerance": "±0.05",
+    "titleBlock": {
+      "drawingNo": "KA-1340-GA", "sheet": "1 OF 1", "scale": "1 : 8", "rev": "F",
+      "drawn": "R. VANE", "checked": "M. OKONKWO", "date": "27 · 08 · 26", "status": "RELEASED"
+    }
+  },
+
+  "bounds": { "length": 1260, "width": 1380, "height": 1380 },
+
+  "drivers": [
+    { "id": "crank",  "min": 0, "max": 100000, "init": 0, "ease": 60 },
+    { "id": "rpm",    "min": 0, "max": 2250, "init": 0, "ease": 0.7, "unit": "rpm" },
+    { "id": "prime",  "min": 0, "max": 1, "init": 0, "ease": 22 },
+    { "id": "cowl",   "min": 0, "max": 1, "init": 1, "ease": 4 },
+    { "id": "apart",  "min": 0, "max": 1, "init": 0, "ease": 1.3 },
+    { "id": "fuel",   "min": 0, "max": 1, "init": 0, "ease": 2.5 }
+  ],
+
+  "parts": [
+    { "id": "case.front", "name": "CRANKCASE, FRONT SECTION", "group": "crankcase",
+      "note": "Forged aluminium, split on the cylinder centreline",
+      "material": "casting", "tone": 0.6, "outline": "heavy",
+      "shape": { "type": "lathe", "segments": 40, "points": [
+        [60, 0], [250, 0], [290, 60], [300, 150], [270, 210], [180, 250], [60, 250] ] },
+      "transform": { "pos": [140, 690, 0], "rot": [0, 0, -90] },
+      "details": [{ "kind": "boltCircle", "face": "top", "r": 205, "count": 16, "boltR": 13, "boltH": 10 }] },
+
+    { "id": "case.rear", "name": "CRANKCASE, REAR SECTION", "group": "crankcase",
+      "note": "Carries the cam drum and the accessory drive train",
+      "parent": "case.front", "material": "casting", "tone": 0.66,
+      "shape": { "type": "lathe", "segments": 40, "points": [
+        [60, 0], [180, 0], [280, 40], [300, 130], [285, 210], [230, 250], [60, 250] ] },
+      "transform": { "pos": [0, -250, 0], "rot": [180, 0, 0] },
+      "details": [{ "kind": "boltCircle", "face": "top", "r": 205, "count": 16, "boltR": 13, "boltH": 10 }] },
+
+    { "id": "case.accessory", "name": "ACCESSORY CASE", "group": "crankcase",
+      "note": "Drives magnetos, fuel pump, tachometer and generator",
+      "parent": "case.rear", "material": "casting", "tone": 0.7,
+      "shape": { "type": "lathe", "segments": 32, "points": [
+        [40, 0], [240, 0], [250, 90], [200, 180], [40, 190] ] },
+      "transform": { "pos": [0, -250, 0] },
+      "details": [
+        { "kind": "boltCircle", "face": "top", "r": 175, "count": 12, "boltR": 11, "boltH": 8 },
+        { "kind": "panelLine", "face": "top", "count": 2, "along": "u" }
+      ],
+      "explode": [-700, 0, 0],
+      "channels": [{ "type": "explode", "bind": "apart" }] },
+
+    { "id": "crank.shaft", "name": "CRANKSHAFT", "group": "crank",
+      "note": "Two-piece, single throw, dynamically counterweighted",
+      "parent": "case.front", "material": "metal", "tone": 0.55,
+      "shape": { "type": "cylinder", "r": 62, "h": 760, "segments": 20 },
+      "transform": { "pos": [0, -130, 0] },
+      "channels": [{ "type": "spin", "axis": "y", "bind": "rpm * 6" }] },
+
+    { "id": "crank.throw", "name": "CRANKPIN & COUNTERWEIGHT", "group": "crank",
+      "note": "Master rod journal, offset 71 mm from the shaft axis",
+      "parent": "crank.shaft", "material": "metal", "tone": 0.72,
+      "shape": { "type": "cylinder", "r": 96, "h": 150, "segments": 18 },
+      "transform": { "pos": [71, 40, 0], "rot": [0, 0, 8] },
+      "channels": [{ "type": "spin", "axis": "y", "bind": "rpm * 6" }] },
+
+    { "id": "cyl.barrel", "name": "CYLINDER BARREL", "group": "cylinder",
+      "note": "Nitrided steel, 146 mm bore, 22 cooling fins — 9 off",
+      "parent": "case.front", "material": "metal", "tone": 0.62, "outline": "heavy",
+      "shape": { "type": "cylinder", "r": 104, "h": 300, "segments": 22 },
+      "transform": { "pos": [0, 175, 0] },
+      "instances": { "pattern": "radial", "count": 9, "axis": "y", "radius": 300, "orient": true },
+      "details": [{ "kind": "corrugation", "face": "right", "count": 11, "amp": 22, "size": [300, 210] }] },
+
+    { "id": "cyl.head", "name": "CYLINDER HEAD", "group": "cylinder",
+      "note": "Cast aluminium, hemispherical chamber, sodium-cooled exhaust valve",
+      "parent": "case.front", "material": "casting", "tone": 0.68,
+      "shape": { "type": "lathe", "segments": 20, "points": [
+        [0, 0], [110, 0], [122, 40], [118, 130], [92, 185], [40, 205], [0, 205] ] },
+      "transform": { "pos": [0, 330, 0] },
+      "instances": { "pattern": "radial", "count": 9, "axis": "y", "radius": 300, "orient": true },
+      "details": [{ "kind": "corrugation", "face": "right", "count": 7, "amp": 18, "size": [190, 210] }],
+      "explode": [0, 420, 0],
+      "channels": [{ "type": "explode", "bind": "apart" }] },
+
+    { "id": "cyl.rockerCover", "name": "ROCKER BOX COVER", "group": "cylinder",
+      "note": "Two per cylinder, intake and exhaust; cork gasketed",
+      "parent": "case.front", "material": "casting", "tone": 0.58,
+      "shape": { "type": "box", "size": [96, 90, 130], "radius": 18 },
+      "transform": { "pos": [0, 470, 96] },
+      "instances": { "pattern": "radial", "count": 9, "axis": "y", "radius": 300, "orient": true, "mirror": "z" },
+      "details": [{ "kind": "fastener", "face": "top", "cu": 0, "cv": 0, "r": 12, "h": 9 }] },
+
+    { "id": "cyl.piston", "name": "PISTON", "group": "cylinder",
+      "note": "Forged, three compression rings, 146 mm stroke — 9 off, 40° apart",
+      "parent": "case.front", "material": "metal", "tone": 0.75,
+      "shape": { "type": "cylinder", "r": 98, "h": 130, "segments": 18 },
+      "transform": { "pos": [0, 210, 0] },
+      "instances": { "pattern": "radial", "count": 9, "axis": "y", "radius": 300, "orient": true },
+      "channels": [
+        { "type": "reciprocate", "target": "pos.y", "stroke": 146, "rod": 330,
+          "spread": "auto", "bind": "crank" }
+      ] },
+
+    { "id": "cyl.pushrod", "name": "PUSHROD & SHROUD TUBE", "group": "valvegear",
+      "note": "Two per cylinder, cam drum to rocker; 18 off",
+      "parent": "case.front", "material": "metal", "tone": 0.7, "outline": "light",
+      "shape": { "type": "cylinder", "r": 22, "h": 400, "segments": 10 },
+      "transform": { "pos": [-60, 300, 128], "rot": [0, 0, 6] },
+      "instances": { "pattern": "radial", "count": 9, "axis": "y", "radius": 300, "orient": true, "mirror": "z" },
+      "channels": [
+        { "type": "reciprocate", "target": "pos.y", "stroke": 22, "spread": "auto", "bind": "crank * 0.5" }
+      ] },
+
+    { "id": "cyl.intake", "name": "INTAKE PIPE", "group": "induction",
+      "note": "From the supercharger collector to the head; 9 off",
+      "parent": "case.front", "material": "metal", "tone": 0.64, "outline": "light",
+      "shape": { "type": "sweep", "radius": 34, "segments": 10,
+        "path": [[0, -180, 0], [0, 0, 40], [0, 180, 90], [0, 330, 96]] },
+      "transform": { "pos": [0, 130, -70] },
+      "instances": { "pattern": "radial", "count": 9, "axis": "y", "radius": 300, "orient": true },
+      "channels": [{ "type": "flow", "bind": "fuel",
+        "path": [[0, -180, 0], [0, 0, 40], [0, 180, 90], [0, 330, 96]] }] },
+
+    { "id": "cyl.exhaust", "name": "EXHAUST STUB", "group": "exhaust",
+      "note": "Short stack, collector ring deleted on this mark; 9 off",
+      "parent": "case.front", "material": "metal", "tone": 0.78,
+      "shape": { "type": "lathe", "segments": 14, "points": [
+        [46, 0], [56, 0], [58, 150], [70, 210], [58, 215], [46, 155] ] },
+      "transform": { "pos": [0, 430, -120], "rot": [-32, 0, 0] },
+      "instances": { "pattern": "radial", "count": 9, "axis": "y", "radius": 300, "orient": true },
+      "channels": [
+        { "type": "emit", "at": [0, 200, 0], "dir": [0, 0.4, -1], "rate": 6, "life": 0.9,
+          "size": 60, "spread": 0.7, "speed": 900, "bind": "rpm / 2250" }
+      ] },
+
+    { "id": "prop.hub", "name": "PROPELLER HUB", "group": "propeller",
+      "note": "Splined, constant-speed governor mounting",
+      "parent": "case.front", "material": "metal", "tone": 0.6,
+      "shape": { "type": "lathe", "segments": 24, "points": [
+        [0, 0], [150, 0], [165, 60], [140, 150], [70, 190], [0, 190] ] },
+      "transform": { "pos": [0, 400, 0] },
+      "details": [{ "kind": "boltCircle", "face": "top", "r": 96, "count": 8, "boltR": 12, "boltH": 9 }],
+      "channels": [{ "type": "spin", "axis": "y", "bind": "rpm * 6" }] },
+
+    { "id": "prop.blade", "name": "PROPELLER BLADE", "group": "propeller",
+      "note": "Three off, 2 740 mm dia, aluminium alloy, 21° pitch at cruise",
+      "parent": "prop.hub", "material": "metal", "tone": 0.5,
+      "shape": { "type": "loft", "sections": [
+        { "at": [0, 0, 0],   "profile": [[-56, -20], [56, -20], [56, 20], [-56, 20]] },
+        { "at": [0, 0, 300], "profile": [[-92, -26], [92, -26], [92, 22], [-92, 22]], "rot": -16 },
+        { "at": [0, 0, 620], "profile": [[-78, -18], [78, -18], [78, 15], [-78, 15]], "rot": -30 },
+        { "at": [0, 0, 830], "profile": [[-30, -8], [30, -8], [30, 7], [-30, 7]], "rot": -38 } ] },
+      "transform": { "pos": [0, 120, 0], "rot": [-90, 0, 0] },
+      "instances": { "pattern": "radial", "count": 3, "axis": "y", "radius": 90, "orient": true },
+      "explode": [0, 500, 0],
+      "channels": [{ "type": "explode", "bind": "apart" }] },
+
+    { "id": "acc.magneto", "name": "MAGNETO", "group": "accessories",
+      "note": "Dual, 9-lobe, fires both plugs per cylinder",
+      "parent": "case.accessory", "material": "plastic", "tone": 0.55,
+      "shape": { "type": "cylinder", "r": 78, "h": 190, "segments": 16 },
+      "transform": { "pos": [0, 120, 150], "rot": [22, 0, 0] },
+      "instances": { "pattern": "radial", "count": 2, "axis": "y", "radius": 150, "orient": true },
+      "details": [{ "kind": "knurl", "face": "top", "r": 74, "count": 14, "h": 60, "ridge": 9 }] },
+
+    { "id": "acc.ignitionLead", "name": "IGNITION HARNESS", "group": "accessories",
+      "note": "Shielded braid, distributor ring to each cylinder",
+      "parent": "case.front", "material": "rubber", "tone": 0.85, "outline": "light",
+      "shape": { "type": "sweep", "radius": 13, "segments": 8,
+        "path": [[0, -230, 30], [0, -60, 120], [0, 180, 150], [0, 400, 120]] },
+      "transform": { "pos": [0, 100, 40] },
+      "instances": { "pattern": "radial", "count": 9, "axis": "y", "radius": 300, "orient": true } },
+
+    { "id": "acc.sumpDrain", "name": "OIL SUMP & SCAVENGE", "group": "accessories",
+      "note": "Dry sump, 26 L/min scavenge at rated power",
+      "parent": "case.rear", "material": "casting", "tone": 0.72,
+      "shape": { "type": "box", "size": [190, 130, 220], "radius": 24 },
+      "transform": { "pos": [0, -80, -330] },
+      "details": [{ "kind": "fastener", "face": "bottom", "r": 16, "h": 12, "kind2": "hex" }] },
+
+    { "id": "acc.oil", "name": "OIL CHARGE", "group": "accessories",
+      "note": "34 L, SAE 50 ashless dispersant",
+      "parent": "acc.sumpDrain", "material": "liquid", "tone": 0.5, "outline": "light",
+      "shape": { "type": "box", "size": [160, 60, 190] },
+      "transform": { "pos": [0, -22, 0] },
+      "channels": [{ "type": "oscillate", "target": "pos.y", "amp": 4, "freq": 1.4, "bind": "rpm / 2250" }] },
+
+    { "id": "cowl.ring", "name": "COWLING RING", "group": "cowling",
+      "note": "Townend ring, removable in four segments for line maintenance",
+      "parent": "case.front", "material": "metal", "tone": 0.4, "outline": "light",
+      "shape": { "type": "lathe", "segments": 48, "points": [
+        [660, 0], [700, 40], [706, 150], [690, 250], [648, 285], [640, 250], [656, 150], [652, 40] ] },
+      "transform": { "pos": [0, 150, 0] },
+      "details": [{ "kind": "rivetRow", "face": "top", "from": [-660, 0], "to": [660, 0], "count": 24, "r": 9 }],
+      "explode": [0, 0, 900],
+      "channels": [
+        { "type": "visibility", "bind": "cowl" },
+        { "type": "explode", "bind": "apart" }
+      ] },
+
+    { "id": "cowl.window", "name": "INSPECTION WINDOW", "group": "cowling",
+      "note": "Perspex, 3 off, over the rocker boxes",
+      "parent": "cowl.ring", "material": "glass", "tone": 0.4,
+      "shape": { "type": "box", "size": [150, 20, 110] },
+      "transform": { "pos": [0, 140, 660], "rot": [0, 0, 0] },
+      "instances": { "pattern": "radial", "count": 3, "axis": "y", "radius": 0, "orient": true },
+      "channels": [{ "type": "visibility", "bind": "cowl" }] },
+
+    { "id": "mount.ring", "name": "ENGINE MOUNT RING", "group": "mounting",
+      "note": "Welded steel tube, eight Lord bonded isolators",
+      "parent": "case.rear", "material": "metal", "tone": 0.6,
+      "shape": { "type": "torus", "r": 430, "tube": 26, "segments": 40, "tubeSegments": 10 },
+      "transform": { "pos": [0, -180, 0], "rot": [90, 0, 0] } },
+
+    { "id": "mount.isolator", "name": "VIBRATION ISOLATOR", "group": "mounting",
+      "note": "Bonded rubber in shear, 8 off, 55 Shore A",
+      "parent": "case.rear", "material": "rubber", "tone": 0.9,
+      "shape": { "type": "cylinder", "r": 44, "h": 80, "segments": 14 },
+      "transform": { "pos": [0, -180, 0] },
+      "instances": { "pattern": "radial", "count": 8, "axis": "y", "radius": 430, "orient": true } },
+
+    { "id": "mount.dataPlate", "name": "DATA PLATE", "group": "mounting",
+      "note": "Type, serial and rated power; riveted to the rear case",
+      "parent": "case.rear", "material": "metal", "tone": 0.35, "outline": "light",
+      "shape": { "type": "box", "size": [150, 6, 90] },
+      "transform": { "pos": [190, -120, 130], "rot": [0, 0, 12] },
+      "details": [{ "kind": "panelLine", "face": "top", "count": 3, "along": "u" }] }
+  ],
+
+  "annotations": {
+    "callouts": [
+      { "n": 1,  "text": "Cylinder barrel, 146 mm bore", "anchor": "cyl.barrel" },
+      { "n": 2,  "text": "Cylinder head, hemi chamber",  "anchor": "cyl.head" },
+      { "n": 3,  "text": "Piston, 146 mm stroke",        "anchor": "cyl.piston" },
+      { "n": 4,  "text": "Pushrod shroud tube",          "anchor": "cyl.pushrod" },
+      { "n": 5,  "text": "Crankshaft, single throw",     "anchor": "crank.shaft" },
+      { "n": 6,  "text": "Propeller hub, constant speed","anchor": "prop.hub" },
+      { "n": 7,  "text": "Magneto, dual 9-lobe",         "anchor": "acc.magneto" },
+      { "n": 8,  "text": "Intake pipe",                  "anchor": "cyl.intake" },
+      { "n": 9,  "text": "Exhaust stub",                 "anchor": "cyl.exhaust" },
+      { "n": 10, "text": "Townend cowling ring",         "anchor": "cowl.ring" },
+      { "n": 11, "text": "Vibration isolator, 8 off",    "anchor": "mount.isolator" },
+      { "n": 12, "text": "Accessory case",               "anchor": "case.accessory" }
+    ],
+    "dimensions": [
+      { "label": "1 380", "from": [0, 0, 0], "to": [0, 1380, 0], "offset": [700, 0, 0] },
+      { "label": "1 260", "from": [-560, 60, 0], "to": [700, 60, 0], "offset": [0, -160, 700] },
+      { "label": "Ø 600", "from": [0, 690, -300], "to": [0, 690, 300], "offset": [-620, 0, 0] }
+    ]
+  },
+
+  "views": [
+    { "id": "iso",   "label": "ISO",   "az": 42,  "el": 20 },
+    { "id": "q34f",  "label": "3/4 F", "az": 70,  "el": 14 },
+    { "id": "q34r",  "label": "3/4 R", "az": -58, "el": 22 },
+    { "id": "front", "label": "FRONT", "az": 90, "el": 0, "projection": "orthographic",
+      "caption": "FRONT ELEVATION", "sub": "Scale 1:8 · nine cylinders on 40° spacing" },
+    { "id": "side",  "label": "SIDE",  "az": 0,  "el": 0, "projection": "orthographic",
+      "caption": "SIDE ELEVATION", "sub": "Scale 1:8 · cowling ring fitted" },
+    { "id": "plan",  "label": "PLAN",  "az": 0,  "el": 89, "projection": "orthographic",
+      "caption": "PLAN VIEW", "sub": "Scale 1:8 · looking down on the thrust axis" },
+    { "id": "secAA", "label": "SEC A-A", "az": 66, "el": 12, "caption": "SECTION A-A",
+      "sub": "cut on the master-rod cylinder, showing piston and crank throw",
+      "section": { "plane": "zx", "at": 690 } }
+  ],
+
+  "motions": [
+    { "id": "idle",   "label": "IDLE",   "set": { "rpm": 620,  "crank": 100000 }, "group": "power" },
+    { "id": "cruise", "label": "CRUISE", "set": { "rpm": 1850, "crank": 100000 }, "group": "power" },
+    { "id": "prime",  "label": "PRIME",  "set": { "prime": 1 }, "momentary": true },
+    { "id": "fuel",   "label": "FUEL",   "set": { "fuel": 1 } },
+    { "id": "cowl",   "label": "COWL",   "set": { "cowl": 0 } },
+    { "id": "apart",  "label": "EXPLODE","set": { "apart": 1 } }
+  ],
+
+  "instruments": [
+    { "label": "CRANK SPEED",      "expr": "rpm",                        "format": "%.0f rpm" },
+    { "label": "PISTON SPEED",     "expr": "rpm * 0.00487",              "format": "%.1f m/s" },
+    { "label": "MANIFOLD PRESSURE","expr": "24 + rpm * 0.0093",          "format": "%.1f inHg" },
+    { "label": "CYLINDERS",        "expr": "9",                          "format": "%.0f" },
+    { "label": "TIP MACH",         "expr": "rpm * 0.0000724",            "format": "%.3f M" },
+    { "label": "REFRESH",          "expr": "fps",                        "format": "%.0f fps" }
+  ]
+}

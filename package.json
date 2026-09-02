@@ -1,0 +1,34 @@
+{
+  "name": "blueprint-3d-sheet",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Turn a 2D drawing, CAD file, or written brief into one self-contained interactive 3D engineering sheet.",
+  "bin": {
+    "b2d": "./bin/b2d.mjs"
+  },
+  "scripts": {
+    "validate": "node bin/b2d.mjs validate",
+    "build": "node bin/b2d.mjs build",
+    "dev": "node bin/b2d.mjs dev",
+    "check": "node dev/gather-check.mjs && node dev/evidence-check.mjs && node dev/research-check.mjs",
+    "selftest": "node bin/b2d.mjs selftest"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "dxf-parser": "^1.1.2",
+    "esbuild": "^0.25.0",
+    "puppeteer": "^25.9.0",
+    "three": "^0.180.0",
+    "three-bvh-csg": "^0.0.17"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lubocsu/blueprint-3d-sheet.git"
+  }
+}

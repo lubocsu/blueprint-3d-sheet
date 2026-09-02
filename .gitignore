@@ -1,0 +1,9 @@
+node_modules/
+out/
+site/
+.cache/
+*.log
+
+# Reference material is local evidence only — never distributed.
+*.mp4
+dev/*.bundle.js

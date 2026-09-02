@@ -1,0 +1,175 @@
+{
+  "meta": {
+    "id": "smoke",
+    "org": "B2D TEST",
+    "division": "Pipeline verification",
+    "title": "SMOKE TEST RIG",
+    "subtitle": "Exercises parenting, instancing, details and every channel type",
+    "archetype": "rotating-machine",
+    "units": "mm",
+    "projection": "FIRST ANGLE",
+    "tolerance": "±0.5",
+    "titleBlock": {
+      "drawingNo": "B2D-0001", "sheet": "1 OF 1", "scale": "1 : 5", "rev": "A",
+      "drawn": "PIPELINE", "checked": "SELFTEST", "date": "26 · 08 · 26", "status": "TEST"
+    }
+  },
+  "bounds": { "length": 900, "width": 520, "height": 620 },
+
+  "drivers": [
+    { "id": "rpm",    "min": 0, "max": 900, "init": 0, "ease": 1.4, "unit": "rpm" },
+    { "id": "open",   "min": 0, "max": 1,   "init": 0, "ease": 3.0 },
+    { "id": "burst",  "min": 0, "max": 1,   "init": 0, "ease": 20 },
+    { "id": "apart",  "min": 0, "max": 1,   "init": 0, "ease": 1.8 },
+    { "id": "guard",  "min": 0, "max": 1,   "init": 1, "ease": 6 }
+  ],
+
+  "parts": [
+    { "id": "bed", "name": "MACHINE BED", "note": "Cast iron bed, stress relieved",
+      "material": "casting", "tone": 0.62,
+      "shape": { "type": "box", "size": [900, 60, 520] },
+      "transform": { "pos": [0, 30, 0] },
+      "details": [
+        { "kind": "boltCircle", "face": "top", "r": 180, "count": 10, "boltR": 9, "boltH": 7 },
+        { "kind": "rivetRow", "face": "front", "from": [-390, 0], "to": [390, 0], "count": 16, "r": 6 },
+        { "kind": "panelLine", "face": "top", "count": 3, "along": "u" }
+      ] },
+
+    { "id": "column", "name": "UPRIGHT COLUMN", "note": "Welded box section, 12 mm plate",
+      "parent": "bed", "material": "metal", "tone": 0.66,
+      "shape": { "type": "box", "size": [140, 420, 200] },
+      "transform": { "pos": [-300, 240, 0] },
+      "details": [{ "kind": "louvre", "face": "front", "size": [100, 220], "count": 7, "depth": 22 }] },
+
+    { "id": "housing", "name": "BEARING HOUSING", "note": "Split housing, 2 × taper roller",
+      "parent": "column", "material": "casting", "tone": 0.6,
+      "shape": { "type": "csg", "op": "subtract", "operands": [
+        { "shape": { "type": "cylinder", "r": 92, "h": 150, "segments": 32 } },
+        { "shape": { "type": "cylinder", "r": 52, "h": 200, "segments": 32 } }
+      ] },
+      "transform": { "pos": [180, 90, 0], "rot": [90, 0, 0] },
+      "details": [{ "kind": "boltCircle", "face": "top", "r": 72, "count": 8, "boltR": 7, "boltH": 6 }] },
+
+    { "id": "shaft", "name": "MAIN SHAFT", "note": "EN24T, 100 mm dia, ground",
+      "parent": "housing", "material": "metal", "tone": 0.55,
+      "shape": { "type": "cylinder", "r": 50, "h": 620, "segments": 28 },
+      "transform": { "pos": [0, 0, 0] },
+      "channels": [{ "type": "spin", "axis": "y", "bind": "rpm * 6" }] },
+
+    { "id": "flywheel", "name": "FLYWHEEL", "note": "Cast iron, 46 kg, balanced to G6.3",
+      "parent": "housing", "material": "casting", "tone": 0.7,
+      "shape": { "type": "lathe", "segments": 40,
+        "points": [[52, -40], [190, -40], [210, -22], [210, 22], [190, 40], [52, 40]] },
+      "transform": { "pos": [0, 250, 0] },
+      "details": [{ "kind": "boltCircle", "face": "top", "r": 120, "count": 12, "boltR": 8, "boltH": 6 }],
+      "channels": [{ "type": "spin", "axis": "y", "bind": "rpm * 6" }] },
+
+    { "id": "vane", "name": "IMPELLER VANE", "note": "8 off, 3 mm stainless, 28° pitch",
+      "parent": "housing", "material": "metal", "tone": 0.68,
+      "shape": { "type": "box", "size": [110, 8, 62] },
+      "transform": { "pos": [0, -210, 0], "rot": [0, 0, 28] },
+      "instances": { "pattern": "radial", "count": 8, "axis": "y", "radius": 105, "orient": true },
+      "channels": [{ "type": "spin", "axis": "y", "bind": "rpm * 6" }] },
+
+    { "id": "guard", "name": "MESH GUARD", "note": "Removable, interlocked to drive",
+      "parent": "bed", "material": "metal", "tone": 0.45, "outline": "light",
+      "shape": { "type": "box", "size": [300, 300, 300] },
+      "transform": { "pos": [180, 220, 0] },
+      "details": [{ "kind": "grille", "face": "front", "size": [260, 260], "rows": 8, "cols": 8, "bar": 6 }],
+      "channels": [{ "type": "visibility", "bind": "guard" }] },
+
+    { "id": "door", "name": "ACCESS DOOR", "note": "Hinged on the left stile, 95° swing",
+      "parent": "column", "material": "plastic", "tone": 0.5,
+      "shape": { "type": "box", "size": [8, 200, 150] },
+      "transform": { "pos": [74, 60, 100] },
+      "channels": [{ "type": "articulate", "target": "rot.y", "from": 0, "to": -95, "bind": "open" }] },
+
+    { "id": "sight", "name": "SIGHT GLASS", "note": "Borosilicate, 40 mm, level datum",
+      "parent": "bed", "material": "glass", "tone": 0.4,
+      "shape": { "type": "cylinder", "r": 40, "h": 16, "segments": 24 },
+      "transform": { "pos": [330, 30, 262], "rot": [90, 0, 0] } },
+
+    { "id": "coolant", "name": "COOLANT CHARGE", "note": "12 L, 6% emulsion",
+      "parent": "bed", "material": "liquid", "tone": 0.45, "outline": "light",
+      "shape": { "type": "box", "size": [700, 26, 380] },
+      "transform": { "pos": [0, -12, 0] },
+      "channels": [{ "type": "oscillate", "target": "pos.y", "amp": 3, "freq": 0.8, "bind": "rpm / 900" }] },
+
+    { "id": "mount", "name": "ANTI-VIBRATION MOUNT", "note": "Bonded elastomer, 55 Shore A",
+      "parent": "bed", "material": "rubber", "tone": 0.8,
+      "shape": { "type": "cylinder", "r": 34, "h": 60, "segments": 16 },
+      "transform": { "pos": [-380, -30, -200] },
+      "instances": { "pattern": "grid", "counts": [2, 1, 2], "steps": [[760, 0, 0], [0, 0, 0], [0, 0, 400]] } },
+
+    { "id": "stack", "name": "EXHAUST STACK", "note": "Ø90 discharge, 2.5 m/s",
+      "parent": "column", "material": "metal", "tone": 0.6,
+      "shape": { "type": "cylinder", "r": 45, "h": 180, "segments": 20 },
+      "transform": { "pos": [0, 300, -60] },
+      "channels": [
+        { "type": "emit", "at": [0, 100, 0], "dir": [0, 1, 0.1], "rate": 9,
+          "life": 1.9, "size": 34, "spread": 0.5, "speed": 120, "bind": "rpm / 900" }
+      ] },
+
+    { "id": "hammer", "name": "IMPACT HAMMER", "note": "Single-shot, 40 mm stroke",
+      "parent": "bed", "material": "metal", "tone": 0.72,
+      "shape": { "type": "box", "size": [70, 120, 70] },
+      "transform": { "pos": [330, 150, -150] },
+      "channels": [{ "type": "impulse", "target": "pos.y", "amp": -70, "attack": 0.04, "decay": 0.5, "bind": "burst" }] },
+
+    { "id": "cover", "name": "TOP COVER", "note": "Lifts clear for maintenance",
+      "parent": "bed", "material": "metal", "tone": 0.5,
+      "shape": { "type": "box", "size": [420, 16, 300] },
+      "transform": { "pos": [180, 400, 0] },
+      "explode": [0, 320, 0],
+      "channels": [{ "type": "explode", "bind": "apart" }] }
+  ],
+
+  "annotations": {
+    "callouts": [
+      { "n": 1, "text": "Main shaft, 100 mm ground", "anchor": "shaft" },
+      { "n": 2, "text": "Flywheel, 46 kg", "anchor": "flywheel" },
+      { "n": 3, "text": "Impeller vane, 8 off", "anchor": "vane" },
+      { "n": 4, "text": "Bearing housing, split", "anchor": "housing" },
+      { "n": 5, "text": "Anti-vibration mount", "anchor": "mount" },
+      { "n": 6, "text": "Sight glass, level datum", "anchor": "sight" },
+      { "n": 7, "text": "Mesh guard, interlocked", "anchor": "guard" },
+      { "n": 8, "text": "Exhaust stack, Ø90", "anchor": "stack" }
+    ],
+    "dimensions": [
+      { "label": "900", "from": [-450, 0, 260], "to": [450, 0, 260], "offset": [0, -70, 60] },
+      { "label": "620", "from": [-450, 0, -260], "to": [-450, 620, -260], "offset": [-90, 0, 0] },
+      { "label": "520", "from": [450, 0, -260], "to": [450, 0, 260], "offset": [90, -60, 0] }
+    ]
+  },
+
+  "views": [
+    { "id": "iso",   "label": "ISO",   "az": 38,  "el": 22 },
+    { "id": "q34",   "label": "3/4 R", "az": 145, "el": 20 },
+    { "id": "side",  "label": "SIDE",  "az": 90, "el": 0, "projection": "orthographic",
+      "caption": "SIDE ELEVATION", "sub": "Scale 1:5 · datum condition" },
+    { "id": "front", "label": "FRONT", "az": 0,  "el": 0, "projection": "orthographic",
+      "caption": "FRONT ELEVATION", "sub": "viewed on arrow F" },
+    { "id": "plan",  "label": "PLAN",  "az": 0,  "el": 89, "projection": "orthographic",
+      "caption": "PLAN VIEW", "sub": "on the bed datum" },
+    { "id": "secAA", "label": "SEC A-A", "az": 24, "el": 14, "caption": "SECTION A-A",
+      "sub": "cut on the shaft centreline", "section": { "plane": "xy", "at": 0 } }
+  ],
+
+  "motions": [
+    { "id": "run",   "label": "RUN",   "set": { "rpm": 420 } },
+    { "id": "fast",  "label": "FAST",  "set": { "rpm": 900 } },
+    { "id": "open",  "label": "OPEN",  "set": { "open": 1 } },
+    { "id": "strike","label": "STRIKE","set": { "burst": 1 }, "momentary": true },
+    { "id": "guard", "label": "GUARD", "set": { "guard": 0 } },
+    { "id": "apart", "label": "EXPLODE", "set": { "apart": 1 } }
+  ],
+
+  "instruments": [
+    { "label": "SHAFT SPEED",   "expr": "rpm",                "format": "%.0f rpm" },
+    { "label": "TIP VELOCITY",  "expr": "rpm * 0.0110",       "format": "%.1f m/s" },
+    { "label": "DOOR ANGLE",    "expr": "open * 95",          "format": "%.1f°" },
+    { "label": "GUARD",         "expr": "guard * 100",        "format": "%.0f %" },
+    { "label": "SEPARATION",    "expr": "apart * 320",        "format": "%.0f mm" },
+    { "label": "REFRESH",       "expr": "fps",                "format": "%.0f fps" }
+  ]
+}

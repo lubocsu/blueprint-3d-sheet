@@ -1,0 +1,21 @@
+{
+  "name": "blueprint-3d-sheet",
+  "description": "Turn a 2D drawing, CAD file, photo, or written brief into ONE self-contained interactive 3D engineering sheet: orthographic plates, numbered callouts on leader lines, dimensions, a section cutaway, a full exploded view, live instrument readouts, and animated motions in a single offline index.html. The emitted page makes no network requests and contains no telemetry. Authoring, validating and building run entirely offline and need no API key; the only network access the toolchain requires is a first-time `npm install`, which may download a Chromium build via puppeteer. Evidence gathering from the web is NOT part of this release: the repository carries unfinished `bundle` and `research` code that can fetch URLs when you invoke it explicitly, but it is untested against real sources and is not a feature of this version — do not rely on it.",
+  "version": "0.1.0",
+  "author": {
+    "name": "lubo"
+  },
+  "homepage": "https://github.com/lubocsu/blueprint-3d-sheet",
+  "license": "MIT",
+  "keywords": [
+    "3d",
+    "blueprint",
+    "engineering-drawing",
+    "exploded-view",
+    "technical-illustration",
+    "three.js",
+    "cad",
+    "dxf",
+    "svg"
+  ]
+}

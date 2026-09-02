@@ -1,0 +1,478 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blueprint-to-display/assembly-spec.json",
+  "title": "AssemblySpec",
+  "type": "object",
+  "required": ["meta", "bounds", "parts"],
+  "additionalProperties": false,
+
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["title", "units"],
+      "additionalProperties": false,
+      "properties": {
+        "id":        { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "org":       { "type": "string" },
+        "division":  { "type": "string" },
+        "title":     { "type": "string", "minLength": 2 },
+        "subtitle":  { "type": "string" },
+        "archetype": { "$ref": "#/$defs/archetype" },
+        "units":     { "enum": ["mm", "cm", "m", "in", "ft", "um", "nm", "A"] },
+        "projection":{ "enum": ["FIRST ANGLE", "THIRD ANGLE"], "default": "FIRST ANGLE" },
+        "tolerance": { "type": "string" },
+        "researched": {
+          "type": "boolean",
+          "description": "True when the figures and component names were checked against sources at ingest time. False means they came from the model's own recollection and have not been verified.",
+          "default": false
+        },
+        "grounding": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "How much of the sheet traces back to the material it was built from. Traceable is not the same as verified: a figure lifted from a source and attached to the wrong part still counts here.",
+          "properties": {
+            "claims":   { "type": "integer", "minimum": 0 },
+            "grounded": { "type": "integer", "minimum": 0 },
+            "ratio":    { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "references": {
+          "type": "array",
+          "description": "Sources the researched facts came from. Displayed on the sheet so a reader can check them.",
+          "items": {
+            "type": "object",
+            "required": ["title", "url"],
+            "additionalProperties": false,
+            "properties": {
+              "title": { "type": "string" },
+              "url":   { "type": "string" }
+            }
+          }
+        },
+        "titleBlock": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "drawingNo": { "type": "string" },
+            "sheet":     { "type": "string" },
+            "scale":     { "type": "string" },
+            "rev":       { "type": "string" },
+            "drawn":     { "type": "string" },
+            "checked":   { "type": "string" },
+            "date":      { "type": "string" },
+            "status":    { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "bounds": {
+      "type": "object",
+      "required": ["length", "width", "height"],
+      "additionalProperties": false,
+      "description": "Overall envelope in meta.units. Drives camera framing, grid scale and default dimensions.",
+      "properties": {
+        "length": { "type": "number", "exclusiveMinimum": 0 },
+        "width":  { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+
+    "drivers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/driver" },
+      "default": []
+    },
+
+    "parts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/part" }
+    },
+
+    "annotations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "callouts":   { "type": "array", "items": { "$ref": "#/$defs/callout" } },
+        "dimensions": { "type": "array", "items": { "$ref": "#/$defs/dimension" } }
+      }
+    },
+
+    "explode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["driver"],
+      "description": "Assembly-wide explode. Declaring this attaches an explode channel to every part that has not declared one, so the whole assembly comes apart rather than the handful of parts wired up by hand. Per-part 'explode' vectors and channels always win.",
+      "properties": {
+        "driver": { "type": "string", "description": "Driver id, 0..1, that drives the separation." },
+        "scale":  { "type": "number", "minimum": 0.1, "maximum": 4, "default": 1,
+                    "description": "Multiplier on every part's separation distance." },
+        "trace":  { "type": "boolean", "default": true,
+                    "description": "Draw a thin leader from each part's rest position to its exploded position, as an exploded assembly drawing does." }
+      }
+    },
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Sheet-wide rendering options.",
+      "properties": {
+        "hatchPitch":   { "type": "number", "minimum": 2, "maximum": 16, "default": 4,
+                          "description": "hatch spacing in CSS pixels" },
+        "materialHatch":{ "enum": ["uniform", "per-material"], "default": "uniform",
+                          "description": "'uniform' draws one 45° crosshatch on every solid surface and keeps material patterns for section cut faces only — this is what the reference does. 'per-material' patterns every surface." },
+        "lineScale":    { "type": "number", "minimum": 0.5, "maximum": 2.5, "default": 1 },
+        "shadow":       { "enum": ["projected", "hull", "none"], "default": "projected",
+                          "description": "'projected' draws a true planar projection of the real geometry, so the shadow follows every motion and shows concavities. 'hull' is a cheap static footprint for very large assemblies." }
+      }
+    },
+
+    "datums": {
+      "type": "array",
+      "description": "Named datum planes drawn as dash-dot centrelines on the orthographic plates.",
+      "items": {
+        "type": "object",
+        "required": ["plane", "at"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string" },
+          "plane": { "enum": ["xy", "yz", "zx"] },
+          "at":    { "type": "number" },
+          "views": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+
+    "views":       { "type": "array", "items": { "$ref": "#/$defs/view" } },
+    "motions":     { "type": "array", "items": { "$ref": "#/$defs/motion" } },
+    "instruments": { "type": "array", "items": { "$ref": "#/$defs/instrument" } }
+  },
+
+  "$defs": {
+    "archetype": {
+      "enum": ["vehicle", "rotating-machine", "mechanism", "structure",
+               "appliance", "vessel", "aircraft", "instrument", "generic"]
+    },
+
+    "vec2": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+    "vec3": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+
+    "profile": {
+      "type": "array",
+      "minItems": 3,
+      "description": "Closed 2D polygon, CCW. Do not repeat the first point.",
+      "items": { "$ref": "#/$defs/vec2" }
+    },
+
+    "polyline3": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/vec3" }
+    },
+
+    "expr": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Safe arithmetic over driver ids and `t` (seconds). Allowed: + - * / % ( ) numbers, and sin cos abs min max clamp step smoothstep floor sign sqrt pow pi."
+    },
+
+    "material": {
+      "enum": ["metal", "casting", "plastic", "glass", "rubber", "wood",
+               "concrete", "masonry", "liquid", "insulation", "fabric", "earth"],
+      "default": "metal"
+    },
+
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pos":   { "$ref": "#/$defs/vec3" },
+        "rot":   { "$ref": "#/$defs/vec3", "description": "XYZ Euler in degrees" },
+        "scale": { "$ref": "#/$defs/vec3" }
+      }
+    },
+
+    "shape": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["type", "size"],
+          "properties": { "type": { "const": "box" }, "size": { "$ref": "#/$defs/vec3" },
+                          "radius": { "type": "number", "minimum": 0, "description": "corner round" } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "r", "h"],
+          "properties": { "type": { "const": "cylinder" }, "r": { "type": "number", "exclusiveMinimum": 0 },
+                          "r2": { "type": "number", "minimum": 0, "description": "top radius; defaults to r" },
+                          "h": { "type": "number", "exclusiveMinimum": 0 },
+                          "segments": { "type": "integer", "minimum": 3, "maximum": 128 },
+                          "arc": { "type": "number", "description": "degrees, default 360" },
+                          "capped": { "type": "boolean" } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "r", "h"],
+          "properties": { "type": { "const": "cone" }, "r": { "type": "number", "exclusiveMinimum": 0 },
+                          "h": { "type": "number", "exclusiveMinimum": 0 },
+                          "segments": { "type": "integer", "minimum": 3, "maximum": 128 } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "r"],
+          "properties": { "type": { "const": "sphere" }, "r": { "type": "number", "exclusiveMinimum": 0 },
+                          "segments": { "type": "integer", "minimum": 4, "maximum": 96 },
+                          "phi": { "type": "number" }, "theta": { "type": "number" } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "r", "tube"],
+          "properties": { "type": { "const": "torus" }, "r": { "type": "number", "exclusiveMinimum": 0 },
+                          "tube": { "type": "number", "exclusiveMinimum": 0 },
+                          "segments": { "type": "integer", "minimum": 3, "maximum": 128 },
+                          "tubeSegments": { "type": "integer", "minimum": 3, "maximum": 64 },
+                          "arc": { "type": "number" } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "size"],
+          "properties": { "type": { "const": "wedge" }, "size": { "$ref": "#/$defs/vec3" },
+                          "taper": { "type": "number", "minimum": 0, "maximum": 1,
+                                     "description": "0 = full triangle, 1 = box" } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "sides", "r", "h"],
+          "properties": { "type": { "const": "prism" }, "sides": { "type": "integer", "minimum": 3, "maximum": 64 },
+                          "r": { "type": "number", "exclusiveMinimum": 0 },
+                          "h": { "type": "number", "exclusiveMinimum": 0 } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "vertices", "faces"],
+          "properties": { "type": { "const": "polyhedron" },
+                          "vertices": { "type": "array", "minItems": 4, "items": { "$ref": "#/$defs/vec3" } },
+                          "faces": { "type": "array", "minItems": 4,
+                                     "items": { "type": "array", "minItems": 3,
+                                                "items": { "type": "integer", "minimum": 0 } } } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "profile", "depth"],
+          "properties": { "type": { "const": "extrude" }, "profile": { "$ref": "#/$defs/profile" },
+                          "depth": { "type": "number", "exclusiveMinimum": 0 },
+                          "bevel": { "type": "number", "minimum": 0 },
+                          "holes": { "type": "array", "items": { "$ref": "#/$defs/profile" } },
+                          "centered": { "type": "boolean", "default": true } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "points"],
+          "properties": { "type": { "const": "lathe" },
+                          "points": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/vec2" },
+                                      "description": "[radius, y] pairs, bottom to top" },
+                          "segments": { "type": "integer", "minimum": 3, "maximum": 128 },
+                          "arc": { "type": "number" } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "path"],
+          "properties": { "type": { "const": "sweep" },
+                          "path": { "$ref": "#/$defs/polyline3" },
+                          "profile": { "$ref": "#/$defs/profile" },
+                          "radius": { "type": "number", "exclusiveMinimum": 0,
+                                      "description": "used when profile is omitted (round tube)" },
+                          "segments": { "type": "integer", "minimum": 3, "maximum": 64 },
+                          "steps": { "type": "integer", "minimum": 2, "maximum": 512 },
+                          "closed": { "type": "boolean" } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "sections"],
+          "properties": { "type": { "const": "loft" },
+                          "sections": { "type": "array", "minItems": 2,
+                            "items": { "type": "object", "required": ["at", "profile"], "additionalProperties": false,
+                              "properties": { "at": { "$ref": "#/$defs/vec3" },
+                                              "profile": { "$ref": "#/$defs/profile" },
+                                              "rot": { "type": "number", "description": "roll in degrees" },
+                                              "scale": { "type": "number" } } } },
+                          "capped": { "type": "boolean", "default": true } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "r", "pitch", "turns", "tube"],
+          "properties": { "type": { "const": "helix" }, "r": { "type": "number", "exclusiveMinimum": 0 },
+                          "pitch": { "type": "number", "exclusiveMinimum": 0 },
+                          "turns": { "type": "number", "exclusiveMinimum": 0 },
+                          "tube": { "type": "number", "exclusiveMinimum": 0 },
+                          "segments": { "type": "integer", "minimum": 3, "maximum": 32 },
+                          "steps": { "type": "integer", "minimum": 8, "maximum": 512 } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "points"],
+          "properties": { "type": { "const": "hull" },
+                          "points": { "type": "array", "minItems": 4, "items": { "$ref": "#/$defs/vec3" } } } },
+
+        { "type": "object", "additionalProperties": false, "required": ["type", "op", "operands"],
+          "properties": { "type": { "const": "csg" },
+                          "op": { "enum": ["subtract", "union", "intersect"] },
+                          "operands": { "type": "array", "minItems": 2,
+                            "items": { "type": "object", "required": ["shape"], "additionalProperties": false,
+                              "properties": { "shape": { "$ref": "#/$defs/shape" },
+                                              "transform": { "$ref": "#/$defs/transform" } } } } } }
+      ]
+    },
+
+    "instances": {
+      "type": "object",
+      "required": ["pattern"],
+      "additionalProperties": false,
+      "description": "Repeat this part. `count` for linear/radial, `counts` for grid. The part's own transform is instance 0.",
+      "properties": {
+        "pattern": { "enum": ["linear", "radial", "grid"] },
+        "count":   { "type": "integer", "minimum": 1, "maximum": 512 },
+        "step":    { "$ref": "#/$defs/vec3", "description": "linear: per-step offset" },
+        "axis":    { "enum": ["x", "y", "z"], "description": "radial: rotation axis" },
+        "radius":  { "type": "number", "description": "radial: ring radius" },
+        "arc":     { "type": "number", "description": "radial: total sweep in degrees, default 360" },
+        "orient":  { "type": "boolean", "description": "radial: rotate each instance to face outward" },
+        "counts":  { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 2, "maxItems": 3 },
+        "steps":   { "type": "array", "items": { "$ref": "#/$defs/vec3" }, "minItems": 2, "maxItems": 3 },
+        "mirror":  { "enum": ["x", "y", "z", "none"], "description": "also mirror the whole set across this axis" }
+      }
+    },
+
+    "detail": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": true,
+      "description": "Procedural greeble applied to a host face. See build/details.mjs for per-kind params.",
+      "properties": {
+        "kind": { "enum": ["boltCircle", "rivetRow", "louvre", "grille", "tread", "panelLine",
+                           "weldSeam", "knurl", "fastener", "mullion", "corrugation", "perforation"] },
+        "face": { "enum": ["top", "bottom", "front", "back", "left", "right"] },
+        "at":   { "$ref": "#/$defs/vec3" },
+        "rot":  { "$ref": "#/$defs/vec3" }
+      }
+    },
+
+    "channel": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": true,
+      "description": "Animation primitive. Values are applied additively on top of the part's base transform.",
+      "properties": {
+        "type": { "enum": ["spin", "oscillate", "reciprocate", "articulate", "pathFollow",
+                           "impulse", "visibility", "explode", "emit", "flow"] },
+        "target": { "type": "string", "pattern": "^(pos|rot|scale)\\.[xyz]$" },
+        "axis":   { "enum": ["x", "y", "z"] },
+        "bind":   { "$ref": "#/$defs/expr" }
+      }
+    },
+
+    "part": {
+      "type": "object",
+      "required": ["id", "name", "shape"],
+      "additionalProperties": false,
+      "properties": {
+        "id":       { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "name":     { "type": "string", "minLength": 2, "description": "Shown in the hover card. Engineering noun." },
+        "note":     { "type": "string", "description": "Hover card subline. One factual engineering detail." },
+        "group":    { "type": "string" },
+        "parent":   { "type": "string", "description": "id of the parent part; transforms compose" },
+        "material": { "$ref": "#/$defs/material" },
+        "tone":     { "type": "number", "minimum": 0, "maximum": 1, "default": 0.6 },
+        "shape":     { "$ref": "#/$defs/shape" },
+        "transform": { "$ref": "#/$defs/transform" },
+        "instances": { "$ref": "#/$defs/instances" },
+        "details":   { "type": "array", "items": { "$ref": "#/$defs/detail" } },
+        "channels":  { "type": "array", "items": { "$ref": "#/$defs/channel" } },
+        "explode":   { "$ref": "#/$defs/vec3", "description": "separation vector; auto-derived if omitted" },
+        "hidden":    { "type": "boolean", "description": "start invisible (variant parts)" },
+        "outline":   { "enum": ["heavy", "normal", "light", "none"], "default": "normal" }
+      }
+    },
+
+    "driver": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id":    { "type": "string", "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$" },
+        "min":   { "type": "number", "default": 0 },
+        "max":   { "type": "number", "default": 1 },
+        "init":  { "type": "number", "default": 0 },
+        "ease":  { "type": "number", "exclusiveMinimum": 0, "default": 2,
+                   "description": "approach rate per second toward target" },
+        "unit":  { "type": "string" },
+        "wrap":  { "type": "boolean", "description": "wrap around max (angles)" }
+      }
+    },
+
+    "callout": {
+      "type": "object",
+      "required": ["n", "text", "anchor"],
+      "additionalProperties": false,
+      "properties": {
+        "n":      { "type": "integer", "minimum": 1, "maximum": 99 },
+        "text":   { "type": "string", "minLength": 3, "description": "Legend line. Spec-grade, e.g. '120 mm L/44 smoothbore'." },
+        "anchor": { "type": "string", "description": "part id the leader points at" },
+        "point":  { "$ref": "#/$defs/vec3", "description": "the exact point the leader lands on, in spec coordinates. Strongly recommended: the derived fallback only approximates the surface." },
+        "instance": { "type": "integer", "minimum": 0, "default": 0,
+                      "description": "which repeat of an instanced part to anchor to (0-based)" },
+        "side":   { "enum": ["auto", "left", "right", "top", "bottom"], "default": "auto" }
+      }
+    },
+
+    "dimension": {
+      "type": "object",
+      "required": ["label", "from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "label":  { "type": "string" },
+        "from":   { "$ref": "#/$defs/vec3" },
+        "to":     { "$ref": "#/$defs/vec3" },
+        "offset": { "$ref": "#/$defs/vec3", "description": "displacement of the dimension line from the measured edge" },
+        "views":  { "type": "array", "items": { "type": "string" }, "description": "only show in these view ids" }
+      }
+    },
+
+    "view": {
+      "type": "object",
+      "required": ["id", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "id":     { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$" },
+        "label":  { "type": "string", "maxLength": 8, "description": "console button text" },
+        "caption":{ "type": "string", "description": "centred caption, e.g. 'SIDE ELEVATION'" },
+        "sub":    { "type": "string", "description": "caption subline" },
+        "projection": { "enum": ["perspective", "orthographic"], "default": "perspective" },
+        "az":     { "type": "number", "description": "azimuth degrees, measured from +Z toward +X. Since X is the length axis, az=0 is the SIDE elevation (profile) and az=90 is the FRONT elevation." },
+        "el":     { "type": "number", "description": "elevation degrees; 90 = plan" },
+        "dist":   { "type": "number", "description": "distance multiplier applied after zoom-to-fit, default 1" },
+        "fit":    { "type": "number", "minimum": 0.3, "maximum": 1,
+                    "description": "fraction of the viewport the projected silhouette should fill, default 0.86" },
+        "callouts": { "type": "boolean", "default": true,
+                      "description": "set false for a bare plate with no balloons (the reference's PLAN view)" },
+        "target": { "$ref": "#/$defs/vec3" },
+        "set": {
+          "type": "object",
+          "description": "Driver values this view implies, e.g. a section view that reveals the internals. Applied between the declared defaults and any active motion, so selecting the view puts the model into the right state without a second click, and a motion can still override it.",
+          "additionalProperties": { "type": "number" }
+        },
+        "section": {
+          "type": "object",
+          "required": ["plane", "at"],
+          "additionalProperties": false,
+          "properties": {
+            "plane": { "enum": ["xy", "yz", "zx"] },
+            "at":    { "type": "number" },
+            "flip":  { "type": "boolean" },
+            "label": { "type": "string", "description": "e.g. 'SECTION B-B'" }
+          }
+        }
+      }
+    },
+
+    "motion": {
+      "type": "object",
+      "required": ["id", "label", "set"],
+      "additionalProperties": false,
+      "properties": {
+        "id":    { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$" },
+        "label": { "type": "string", "maxLength": 8 },
+        "set":   { "type": "object", "minProperties": 1,
+                   "additionalProperties": { "type": "number" },
+                   "description": "driver id -> target value while this motion is active" },
+        "momentary": { "type": "boolean", "description": "fires once then releases (recoil, shutter)" },
+        "group": { "type": "string", "description": "motions sharing a group are mutually exclusive" }
+      }
+    },
+
+    "instrument": {
+      "type": "object",
+      "required": ["label", "expr"],
+      "additionalProperties": false,
+      "properties": {
+        "label":  { "type": "string" },
+        "expr":   { "$ref": "#/$defs/expr" },
+        "format": { "type": "string", "default": "%.1f",
+                    "description": "printf-ish: %d %.1f %.2f %03.1f, plus trailing literal units" },
+        "unit":   { "type": "string" }
+      }
+    }
+  }
+}

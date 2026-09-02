@@ -1,0 +1,574 @@
+{
+  "meta": {
+    "id": "mbt-mk6",
+    "org": "OBSIDIAN DYNAMICS",
+    "division": "Armoured Systems Division · Vehicle Engineering",
+    "title": "MAIN BATTLE TANK · MK VI \"DOOMFORGE\"",
+    "subtitle": "General arrangement, running gear & armament kinematics",
+    "archetype": "vehicle",
+    "units": "mm",
+    "projection": "FIRST ANGLE",
+    "tolerance": "±2",
+    "titleBlock": {
+      "drawingNo": "SW-5123-KW", "sheet": "1 OF 1", "scale": "1 : 24", "rev": "C",
+      "drawn": "S. DILUM", "checked": "C. KENT", "date": "26 · 08 · 25", "status": "RELEASED"
+    }
+  },
+
+  "bounds": { "length": 9980, "width": 3600, "height": 2360 },
+
+  "drivers": [
+    { "id": "speed",  "min": 0, "max": 42, "init": 0, "ease": 0.9, "unit": "km/h" },
+    { "id": "scan",   "min": 0, "max": 1,  "init": 0, "ease": 1.2 },
+    { "id": "fire",   "min": 0, "max": 1,  "init": 0, "ease": 24 },
+    { "id": "blast",  "min": 0, "max": 1,  "init": 0, "ease": 14 },
+    { "id": "skirts", "min": 0, "max": 1,  "init": 1, "ease": 4 },
+    { "id": "apart",  "min": 0, "max": 1,  "init": 0, "ease": 1.3 },
+    { "id": "smoke",  "min": 0, "max": 1,  "init": 0, "ease": 3 },
+    { "id": "reveal", "min": 0, "max": 1,  "init": 0, "ease": 2.6 }
+  ],
+
+  "explode": { "driver": "apart", "scale": 1.0, "trace": true },
+
+  "parts": [
+    { "id": "hull.main", "name": "HULL, UPPER", "group": "hull",
+      "note": "Welded RHA with composite front cheek; glacis at 68° from vertical",
+      "material": "metal", "tone": 0.62, "outline": "heavy",
+      "shape": { "type": "extrude", "depth": 3200, "profile": [
+        [-3400, 520], [3350, 520], [3820, 900], [4180, 1480],
+        [2300, 1560], [-2500, 1560], [-3400, 1380] ] },
+      "transform": { "pos": [0, 0, 0] },
+      "details": [
+        { "kind": "panelLine", "face": "top", "count": 3, "along": "v" },
+        { "kind": "weldSeam", "face": "top", "r": 26,
+          "path": [[2300, 1562, -1600], [2300, 1562, 1600]] }
+      ] },
+
+    { "id": "hull.belly", "name": "BELLY PLATE", "group": "hull",
+      "note": "V-form 38 mm plate, mine-blast deflecting",
+      "parent": "hull.main", "material": "metal", "tone": 0.72,
+      "shape": { "type": "wedge", "size": [6600, 260, 3100], "taper": 0.82 },
+      "transform": { "pos": [-100, 420, 0], "rot": [0, 0, 180] } },
+
+    { "id": "hull.deck", "name": "POWERPACK DECK", "group": "hull",
+      "note": "Bolted access deck over the powerpack, 14 fasteners",
+      "parent": "hull.main", "material": "metal", "tone": 0.48,
+      "shape": { "type": "box", "size": [2400, 40, 2500] },
+      "transform": { "pos": [-1500, 1580, 0] },
+      "details": [
+        { "kind": "louvre", "face": "top", "size": [1900, 1500], "count": 9, "depth": 150, "angle": 38 },
+        { "kind": "rivetRow", "face": "top", "from": [-1150, -1180], "to": [1150, -1180], "count": 14, "r": 32 },
+        { "kind": "rivetRow", "face": "top", "from": [-1150, 1180], "to": [1150, 1180], "count": 14, "r": 32 }
+      ],
+      "explode": [0, 2200, 0],
+      "channels": [{ "type": "explode", "bind": "apart" }] },
+
+    { "id": "hull.glacisPlate", "name": "GLACIS APPLIQUE", "group": "hull",
+      "note": "Bolt-on composite front cheek, 62° swept",
+      "parent": "hull.main", "material": "casting", "tone": 0.66,
+      "shape": { "type": "box", "size": [1150, 60, 2600] },
+      "transform": { "pos": [3620, 1080, 0], "rot": [0, 0, -58] },
+      "details": [{ "kind": "boltCircle", "face": "top", "r": 900, "count": 14, "boltR": 42, "boltH": 26 }],
+      "explode": [1800, 900, 0],
+      "channels": [{ "type": "explode", "bind": "apart" }] },
+
+    { "id": "hull.rearPlate", "name": "REAR PLATE", "group": "hull",
+      "note": "Hinged for powerpack extraction; exhaust grilles port and starboard",
+      "parent": "hull.main", "material": "metal", "tone": 0.7,
+      "shape": { "type": "box", "size": [80, 820, 2900] },
+      "transform": { "pos": [-3420, 960, 0] },
+      "details": [
+        { "kind": "grille", "face": "right", "size": [900, 520], "rows": 5, "cols": 9, "bar": 26, "cv": 0, "cu": -700 },
+        { "kind": "grille", "face": "right", "size": [900, 520], "rows": 5, "cols": 9, "bar": 26, "cv": 0, "cu": 700 }
+      ] },
+
+    { "id": "hull.towEye", "name": "TOWING EYE", "group": "hull",
+      "note": "Forged, 42 t rated, 4 off",
+      "parent": "hull.main", "material": "metal", "tone": 0.8,
+      "shape": { "type": "torus", "r": 130, "tube": 46, "segments": 18, "tubeSegments": 8 },
+      "transform": { "pos": [3620, 700, 1150], "rot": [0, 0, 90] },
+      "instances": { "pattern": "linear", "count": 2, "step": [-7100, 0, 0], "mirror": "z" } },
+
+    { "id": "hull.stowage", "name": "STOWAGE BIN", "group": "hull",
+      "note": "Crew kit, 260 L, port and starboard sponson",
+      "parent": "hull.main", "material": "plastic", "tone": 0.5,
+      "shape": { "type": "box", "size": [1300, 420, 300] },
+      "transform": { "pos": [-1700, 1350, 1720] },
+      "instances": { "pattern": "linear", "count": 1, "step": [0, 0, 0], "mirror": "z" },
+      "details": [{ "kind": "panelLine", "face": "front", "count": 2, "along": "u" }] },
+
+    { "id": "run.trackFrameR", "name": "RUNNING GEAR FRAME, STBD", "group": "running",
+      "note": "Torsion-bar station carrier, seven road wheels per side",
+      "parent": "hull.main", "material": "metal", "tone": 0.6, "outline": "light",
+      "shape": { "type": "box", "size": [7000, 60, 40] },
+      "transform": { "pos": [0, 500, 1450] } },
+
+    { "id": "run.trackFrameL", "name": "RUNNING GEAR FRAME, PORT", "group": "running",
+      "note": "Mirror of the starboard carrier",
+      "parent": "hull.main", "material": "metal", "tone": 0.6, "outline": "light",
+      "shape": { "type": "box", "size": [7000, 60, 40] },
+      "transform": { "pos": [0, 500, -1450] } },
+
+    { "id": "run.roadwheelR", "name": "ROAD WHEEL, STBD", "group": "running",
+      "note": "800 mm dia, rubber tyred, twin disc — 7 per side",
+      "parent": "run.trackFrameR", "material": "metal", "tone": 0.68,
+      "shape": { "type": "lathe", "segments": 24, "points": [
+        [90, -110], [300, -110], [340, -80], [400, -60], [400, 60], [340, 80], [300, 110], [90, 110] ] },
+      "transform": { "pos": [-2700, 0, 60], "rot": [90, 0, 0] },
+      "instances": { "pattern": "linear", "count": 7, "step": [900, 0, 0] },
+      "details": [{ "kind": "boltCircle", "face": "top", "r": 200, "count": 8, "boltR": 26, "boltH": 18 }],
+      "channels": [
+        { "type": "spin", "axis": "y", "bind": "speed * 44" },
+        { "type": "oscillate", "target": "pos.z", "amp": 26, "freq": 2.1, "bind": "speed / 42" }
+      ] },
+
+    { "id": "run.roadwheelL", "name": "ROAD WHEEL, PORT", "group": "running",
+      "note": "800 mm dia, rubber tyred, twin disc — 7 per side",
+      "parent": "run.trackFrameL", "material": "metal", "tone": 0.68,
+      "shape": { "type": "lathe", "segments": 24, "points": [
+        [90, -110], [300, -110], [340, -80], [400, -60], [400, 60], [340, 80], [300, 110], [90, 110] ] },
+      "transform": { "pos": [-2700, 0, -60], "rot": [90, 0, 0] },
+      "instances": { "pattern": "linear", "count": 7, "step": [900, 0, 0] },
+      "details": [{ "kind": "boltCircle", "face": "top", "r": 200, "count": 8, "boltR": 26, "boltH": 18 }],
+      "channels": [
+        { "type": "spin", "axis": "y", "bind": "speed * 44" },
+        { "type": "oscillate", "target": "pos.z", "amp": 26, "freq": 2.3, "bind": "speed / 42" }
+      ] },
+
+    { "id": "run.swingArmR", "name": "TORSION-BAR SWING ARM", "group": "running",
+      "note": "±180 mm wheel travel against a transverse torsion bar",
+      "parent": "run.trackFrameR", "material": "metal", "tone": 0.75, "outline": "light",
+      "shape": { "type": "box", "size": [420, 130, 90] },
+      "transform": { "pos": [-2480, 190, 20] },
+      "instances": { "pattern": "linear", "count": 7, "step": [900, 0, 0], "mirror": "z" },
+      "channels": [{ "type": "oscillate", "target": "rot.z", "amp": 2.6, "freq": 2.1, "bind": "speed / 42" }] },
+
+    { "id": "run.sprocketR", "name": "DRIVE SPROCKET", "group": "running",
+      "note": "12 teeth, final-drive output, rear mounted",
+      "parent": "run.trackFrameR", "material": "metal", "tone": 0.72,
+      "shape": { "type": "cylinder", "r": 300, "h": 200, "segments": 24 },
+      "transform": { "pos": [-3300, 0, 60], "rot": [90, 0, 0] },
+      "instances": { "pattern": "linear", "count": 1, "step": [0, 0, 0], "mirror": "z" },
+      "details": [{ "kind": "knurl", "face": "top", "r": 320, "count": 12, "h": 190, "ridge": 62 }],
+      "channels": [{ "type": "spin", "axis": "y", "bind": "speed * 58" }] },
+
+    { "id": "run.idlerR", "name": "COMPENSATING IDLER", "group": "running",
+      "note": "Track tension adjuster, eccentric crank mounting",
+      "parent": "run.trackFrameR", "material": "metal", "tone": 0.7,
+      "shape": { "type": "lathe", "segments": 20, "points": [
+        [80, -95], [280, -95], [330, -60], [330, 60], [280, 95], [80, 95] ] },
+      "transform": { "pos": [3300, -20, 60], "rot": [90, 0, 0] },
+      "instances": { "pattern": "linear", "count": 1, "step": [0, 0, 0], "mirror": "z" },
+      "channels": [{ "type": "spin", "axis": "y", "bind": "speed * 66" }] },
+
+    { "id": "run.returnRollerR", "name": "TRACK RETURN ROLLER", "group": "running",
+      "note": "3 per side, supporting the upper track run",
+      "parent": "run.trackFrameR", "material": "rubber", "tone": 0.8,
+      "shape": { "type": "cylinder", "r": 130, "h": 150, "segments": 16 },
+      "transform": { "pos": [-1600, 420, 60], "rot": [90, 0, 0] },
+      "instances": { "pattern": "linear", "count": 3, "step": [1700, 0, 0], "mirror": "z" },
+      "channels": [{ "type": "spin", "axis": "y", "bind": "speed * 132" }] },
+
+    { "id": "run.trackLinkR", "name": "TRACK LINK, STBD", "group": "running",
+      "note": "Cast link with rubber pad, 196 mm pitch — 44 per side",
+      "parent": "run.trackFrameR", "material": "casting", "tone": 0.78, "outline": "light",
+      "shape": { "type": "box", "size": [180, 70, 550] },
+      "transform": { "pos": [0, 0, 0] },
+      "instances": { "pattern": "linear", "count": 44, "step": [0, 0, 0] },
+      "channels": [{ "type": "pathFollow", "bind": "t * speed * 0.020", "closed": true, "orient": false,
+        "path": [
+          [3300, 440, 0], [3560, 360, 0], [3640, 140, 0], [3640, -140, 0], [3560, -360, 0], [3300, -440, 0],
+          [1600, -450, 0], [0, -450, 0], [-1600, -450, 0],
+          [-3300, -440, 0], [-3560, -360, 0], [-3640, -140, 0], [-3640, 140, 0], [-3560, 360, 0], [-3300, 440, 0],
+          [-1600, 440, 0], [0, 440, 0], [1600, 440, 0] ] }] },
+
+    { "id": "run.trackLinkL", "name": "TRACK LINK, PORT", "group": "running",
+      "note": "Cast link with rubber pad, 196 mm pitch — 44 per side",
+      "parent": "run.trackFrameL", "material": "casting", "tone": 0.78, "outline": "light",
+      "shape": { "type": "box", "size": [180, 70, 550] },
+      "transform": { "pos": [0, 0, 0] },
+      "instances": { "pattern": "linear", "count": 44, "step": [0, 0, 0] },
+      "channels": [{ "type": "pathFollow", "bind": "t * speed * 0.020", "closed": true, "orient": false,
+        "path": [
+          [3300, 440, 0], [3560, 360, 0], [3640, 140, 0], [3640, -140, 0], [3560, -360, 0], [3300, -440, 0],
+          [1600, -450, 0], [0, -450, 0], [-1600, -450, 0],
+          [-3300, -440, 0], [-3560, -360, 0], [-3640, -140, 0], [-3640, 140, 0], [-3560, 360, 0], [-3300, 440, 0],
+          [-1600, 440, 0], [0, 440, 0], [1600, 440, 0] ] }] },
+
+    { "id": "run.skirtR", "name": "SIDE SKIRT", "group": "running",
+      "note": "Spaced appliqué over the running gear; removable in six panels",
+      "parent": "run.trackFrameR", "material": "metal", "tone": 0.5,
+      "shape": { "type": "box", "size": [1100, 700, 50] },
+      "transform": { "pos": [-2750, 340, 340] },
+      "instances": { "pattern": "linear", "count": 6, "step": [1120, 0, 0], "mirror": "z" },
+      "details": [{ "kind": "panelLine", "face": "front", "count": 2, "along": "u" }],
+      "explode": [0, 0, 1600],
+      "channels": [
+        { "type": "visibility", "bind": "skirts" },
+        { "type": "explode", "bind": "apart" }
+      ] },
+
+    { "id": "turret.ring", "name": "TURRET RING", "group": "turret",
+      "note": "2 240 mm raceway, section B-B datum",
+      "parent": "hull.main", "material": "metal", "tone": 0.6,
+      "shape": { "type": "cylinder", "r": 1120, "h": 90, "segments": 40 },
+      "transform": { "pos": [-200, 1590, 0] },
+      "details": [{ "kind": "boltCircle", "face": "top", "r": 1020, "count": 24, "boltR": 34, "boltH": 22 }] },
+
+    { "id": "turret.shell", "name": "TURRET SHELL", "group": "turret",
+      "note": "Composite cheeks swept 62° from centreline",
+      "parent": "turret.ring", "material": "metal", "tone": 0.6, "outline": "heavy",
+      "shape": { "type": "hull", "points": [
+        [-1750, 0, -1380], [1150, 0, -1180], [1420, 0, -520], [1420, 0, 520], [1150, 0, 1180], [-1750, 0, 1380],
+        [-1560, 700, -980], [880, 700, -760], [1060, 700, -300], [1060, 700, 300], [880, 700, 760], [-1560, 700, 980] ] },
+      "transform": { "pos": [0, 60, 0] },
+      "details": [
+        { "kind": "panelLine", "face": "top", "count": 2, "along": "u" },
+        { "kind": "weldSeam", "face": "top", "r": 22, "path": [[-1500, 700, -900], [800, 700, -700]] },
+        { "kind": "weldSeam", "face": "top", "r": 22, "path": [[-1500, 700, 900], [800, 700, 700]] }
+      ],
+      "explode": [0, 2600, 0],
+      "channels": [
+        { "type": "oscillate", "target": "rot.y", "amp": 28, "freq": 0.06, "bind": "scan" },
+        { "type": "explode", "bind": "apart" }
+      ] },
+
+    { "id": "turret.roof", "name": "TURRET ROOF", "group": "turret",
+      "note": "38 mm roof, spall liner backed",
+      "parent": "turret.shell", "material": "metal", "tone": 0.42,
+      "shape": { "type": "box", "size": [2500, 40, 1700] },
+      "transform": { "pos": [-350, 715, 0] },
+      "details": [{ "kind": "rivetRow", "face": "top", "from": [-1150, -780], "to": [1150, -780], "count": 12, "r": 26 }] },
+
+    { "id": "turret.cupola", "name": "COMMANDER'S CUPOLA", "group": "turret",
+      "note": "Panoramic sight, 360° independent traverse, 8 vision blocks",
+      "parent": "turret.shell", "material": "metal", "tone": 0.62,
+      "shape": { "type": "lathe", "segments": 20, "points": [
+        [0, 0], [420, 0], [440, 90], [400, 210], [330, 260], [0, 260] ] },
+      "transform": { "pos": [-450, 730, 620] },
+      "details": [{ "kind": "perforation", "face": "top", "rows": 1, "cols": 8, "r": 44, "size": [720, 1] }],
+      "channels": [{ "type": "spin", "axis": "y", "bind": "scan * 22" }] },
+
+    { "id": "turret.panoramic", "name": "PANORAMIC SIGHT HEAD", "group": "turret",
+      "note": "Stabilised day/thermal head, hunter-killer capable",
+      "parent": "turret.cupola", "material": "glass", "tone": 0.4,
+      "shape": { "type": "cylinder", "r": 210, "h": 260, "segments": 20 },
+      "transform": { "pos": [0, 380, 0] } },
+
+    { "id": "turret.gunnerSight", "name": "GUNNER'S PRIMARY SIGHT", "group": "turret",
+      "note": "Armoured shutter, laser rangefinder co-aligned",
+      "parent": "turret.shell", "material": "glass", "tone": 0.45,
+      "shape": { "type": "box", "size": [420, 300, 340] },
+      "transform": { "pos": [430, 700, -560] } },
+
+    { "id": "turret.smokeBank", "name": "SMOKE DISCHARGERS", "group": "turret",
+      "note": "2 × 4 barrels, 76 mm multispectral, 30° elevation",
+      "parent": "turret.shell", "material": "metal", "tone": 0.68,
+      "shape": { "type": "cylinder", "r": 90, "h": 340, "segments": 12 },
+      "transform": { "pos": [700, 480, -1000], "rot": [-28, 0, 22] },
+      "instances": { "pattern": "linear", "count": 4, "step": [0, 0, -210], "mirror": "z" },
+      "channels": [
+        { "type": "emit", "at": [0, 220, 0], "dir": [0.35, 0.85, -0.3], "rate": 14, "life": 2.4,
+          "size": 200, "spread": 0.6, "speed": 2600, "bind": "smoke" }
+      ] },
+
+    { "id": "turret.bustle", "name": "BUSTLE STOWAGE RACK", "group": "turret",
+      "note": "Tubular rack, crew stowage and blow-off panel clearance",
+      "parent": "turret.shell", "material": "metal", "tone": 0.55, "outline": "light",
+      "shape": { "type": "box", "size": [1400, 620, 1900] },
+      "transform": { "pos": [-2050, 420, 0] },
+      "details": [
+        { "kind": "grille", "face": "top", "size": [1300, 1800], "rows": 3, "cols": 4, "bar": 44 },
+        { "kind": "grille", "face": "right", "size": [1800, 560], "rows": 3, "cols": 5, "bar": 44 },
+        { "kind": "grille", "face": "left", "size": [1800, 560], "rows": 3, "cols": 5, "bar": 44 },
+        { "kind": "grille", "face": "back", "size": [1300, 560], "rows": 3, "cols": 4, "bar": 44 }
+      ],
+      "explode": [-2400, 900, 0],
+      "channels": [{ "type": "explode", "bind": "apart" }] },
+
+    { "id": "turret.hatch", "name": "LOADER'S HATCH", "group": "turret",
+      "note": "Sliding hatch, 620 mm clear aperture",
+      "parent": "turret.shell", "material": "metal", "tone": 0.5,
+      "shape": { "type": "cylinder", "r": 340, "h": 60, "segments": 20 },
+      "transform": { "pos": [-450, 745, -560] },
+      "details": [{ "kind": "boltCircle", "face": "top", "r": 250, "count": 10, "boltR": 22, "boltH": 14 }] },
+
+    { "id": "turret.antenna", "name": "WHIP ANTENNA", "group": "turret",
+      "note": "2 off, VHF combat net, 3.2 m extended",
+      "parent": "turret.shell", "material": "metal", "tone": 0.4, "outline": "light",
+      "shape": { "type": "cylinder", "r": 18, "h": 1900, "segments": 6 },
+      "transform": { "pos": [-1500, 1600, 760], "rot": [0, 0, 6] },
+      "instances": { "pattern": "linear", "count": 1, "step": [0, 0, 0], "mirror": "z" },
+      "channels": [{ "type": "oscillate", "target": "rot.z", "amp": 3.2, "freq": 1.6, "bind": "speed / 42" }] },
+
+    { "id": "gun.mantlet", "name": "GUN MANTLET", "group": "armament",
+      "note": "Cast mantlet, ±20° elevation, 260 mm effective",
+      "parent": "turret.shell", "material": "casting", "tone": 0.66,
+      "shape": { "type": "lathe", "segments": 24, "points": [
+        [0, -260], [560, -240], [620, -60], [600, 120], [420, 240], [0, 250] ] },
+      "transform": { "pos": [1180, 400, 0], "rot": [0, 0, -90] },
+      "channels": [{ "type": "oscillate", "target": "rot.x", "amp": 5, "freq": 0.05, "bind": "scan" }] },
+
+    { "id": "gun.barrel", "name": "120 mm L/44 SMOOTHBORE", "group": "armament",
+      "note": "Autofrettaged tube, chrome lined, 5 280 mm from breech face",
+      "parent": "gun.mantlet", "material": "metal", "tone": 0.58,
+      "shape": { "type": "lathe", "segments": 22, "points": [
+        [0, 0], [190, 0], [180, 900], [150, 2200], [140, 3600], [148, 4900], [130, 5100], [0, 5100] ] },
+      "transform": { "pos": [0, 0, 0], "rot": [0, 0, 0] },
+      "channels": [
+        { "type": "impulse", "target": "pos.y", "amp": -820, "attack": 0.03, "decay": 0.6, "bind": "fire" },
+        { "type": "emit", "at": [0, 5260, 0], "dir": [0, 1, 0], "rate": 70, "life": 1.3,
+          "size": 620, "spread": 0.34, "speed": 3100, "bind": "blast" }
+      ] },
+
+    { "id": "gun.thermalSleeve", "name": "THERMAL SLEEVE", "group": "armament",
+      "note": "Glass-reinforced shroud in three sections, droop compensating",
+      "parent": "gun.barrel", "material": "plastic", "tone": 0.6,
+      "shape": { "type": "cylinder", "r": 230, "h": 900, "segments": 20 },
+      "transform": { "pos": [0, 1250, 0] },
+      "instances": { "pattern": "linear", "count": 3, "step": [0, 1100, 0] },
+      "details": [{ "kind": "panelLine", "face": "top", "count": 1, "along": "u" }] },
+
+    { "id": "gun.fumeExtractor", "name": "FUME EXTRACTOR", "group": "armament",
+      "note": "Bore evacuator at 0.62 of tube length",
+      "parent": "gun.barrel", "material": "metal", "tone": 0.64,
+      "shape": { "type": "lathe", "segments": 22, "points": [
+        [140, 0], [310, 90], [320, 620], [140, 710] ] },
+      "transform": { "pos": [0, 2650, 0] },
+      "channels": [
+        { "type": "emit", "at": [0, 360, 0], "dir": [0, 1, 0], "rate": 30, "life": 2.0,
+          "size": 300, "spread": 0.9, "speed": 620, "bind": "blast" }
+      ] },
+
+    { "id": "gun.muzzleBrake", "name": "MUZZLE REFERENCE SYSTEM", "group": "armament",
+      "note": "MRS mirror and bore-sight collar at the muzzle",
+      "parent": "gun.barrel", "material": "metal", "tone": 0.72,
+      "shape": { "type": "cylinder", "r": 185, "h": 420, "segments": 16 },
+      "transform": { "pos": [0, 5000, 0] },
+      "details": [{ "kind": "knurl", "face": "top", "r": 190, "count": 16, "h": 380, "ridge": 26 }] },
+
+    { "id": "crew.driverHatch", "name": "DRIVER'S HATCH", "group": "crew",
+      "note": "Reclining station, three periscopes, centre glacis",
+      "parent": "hull.main", "material": "metal", "tone": 0.5,
+      "shape": { "type": "cylinder", "r": 330, "h": 60, "segments": 20 },
+      "transform": { "pos": [2050, 1580, 0] },
+      "details": [{ "kind": "perforation", "face": "top", "rows": 1, "cols": 3, "r": 60, "size": [420, 1] }] },
+
+    { "id": "crew.headlamp", "name": "CONVOY LAMP", "group": "crew",
+      "note": "Armoured lamp cluster, blackout filter fitted",
+      "parent": "hull.main", "material": "glass", "tone": 0.42,
+      "shape": { "type": "box", "size": [180, 220, 240] },
+      "transform": { "pos": [3900, 1180, 1300] },
+      "instances": { "pattern": "linear", "count": 1, "step": [0, 0, 0], "mirror": "z" } },
+
+    { "id": "power.engine", "name": "V12 DIESEL, 1 500 hp", "group": "power",
+      "note": "60° V12, 27.4 L, 1 500 hp at 2 600 rpm; transverse-mounted powerpack",
+      "parent": "hull.main", "material": "casting", "tone": 0.58, "hidden": true,
+      "shape": { "type": "extrude", "depth": 1900, "profile": [
+        [-680, -340], [680, -340], [680, 0], [420, 560], [140, 560],
+        [0, 60], [-140, 560], [-420, 560], [-680, 0] ] },
+      "transform": { "pos": [-2000, 980, 0], "rot": [0, 90, 0] },
+      "details": [
+        { "kind": "boltCircle", "face": "top", "r": 300, "count": 12, "boltR": 34, "boltH": 22 },
+        { "kind": "panelLine", "face": "front", "count": 6, "along": "u" }
+      ],
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "power.transmission", "name": "TRANSMISSION", "group": "power",
+      "note": "Hydrokinetic, 4 forward 2 reverse, integral steering differential",
+      "parent": "hull.main", "material": "metal", "tone": 0.64, "hidden": true,
+      "shape": { "type": "lathe", "segments": 20, "points": [
+        [0, -420], [520, -420], [560, -180], [520, 180], [380, 380], [0, 380] ] },
+      "transform": { "pos": [-3020, 950, 0], "rot": [0, 0, -90] },
+      "details": [{ "kind": "boltCircle", "face": "top", "r": 470, "count": 16, "boltR": 30, "boltH": 20 }],
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "power.coolingPack", "name": "COOLING PACK", "group": "power",
+      "note": "Cross-flow radiator and oil cooler, 2 × 640 mm hydraulic fans",
+      "parent": "hull.main", "material": "metal", "tone": 0.5, "hidden": true,
+      "shape": { "type": "box", "size": [1500, 300, 2100] },
+      "transform": { "pos": [-1480, 1370, 0] },
+      "details": [
+        { "kind": "grille", "face": "top", "size": [1400, 2000], "rows": 6, "cols": 10, "bar": 30 },
+        { "kind": "corrugation", "face": "front", "count": 18, "amp": 14, "size": [280, 1900] }
+      ],
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "power.airCleaner", "name": "AIR CLEANER", "group": "power",
+      "note": "Two-stage cyclonic precleaner, 1 100 mm barrel per bank",
+      "parent": "hull.main", "material": "metal", "tone": 0.55, "hidden": true,
+      "shape": { "type": "cylinder", "r": 280, "h": 1100, "segments": 20 },
+      "transform": { "pos": [-900, 1180, 1050], "rot": [90, 0, 0] },
+      "instances": { "pattern": "linear", "count": 1, "step": [0, 0, 0], "mirror": "z" },
+      "details": [{ "kind": "knurl", "face": "top", "r": 280, "count": 24, "h": 40, "ridge": 12 }],
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "power.exhaustManifold", "name": "EXHAUST MANIFOLD", "group": "power",
+      "note": "Shrouded twin-branch manifold to the rear grilles; 620 °C skin",
+      "parent": "hull.main", "material": "casting", "tone": 0.72, "hidden": true,
+      "shape": { "type": "sweep", "radius": 105,
+        "path": [[-1150, 1300, 640], [-1900, 1330, 780], [-2600, 1230, 900],
+                 [-3100, 1080, 1000], [-3380, 1000, 1050]] },
+      "instances": { "pattern": "linear", "count": 1, "step": [0, 0, 0], "mirror": "z" },
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "fuel.cellR", "name": "FUEL CELL, STBD", "group": "fuel",
+      "note": "Self-sealing sponson cell, 620 L; 1 280 L total in four cells",
+      "parent": "hull.main", "material": "plastic", "tone": 0.44, "hidden": true,
+      "shape": { "type": "box", "size": [2600, 620, 480], "radius": 60 },
+      "transform": { "pos": [400, 900, 1250] },
+      "instances": { "pattern": "linear", "count": 1, "step": [0, 0, 0], "mirror": "z" },
+      "details": [{ "kind": "panelLine", "face": "front", "count": 3, "along": "u" }],
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "run.torsionBar", "name": "TORSION BAR", "group": "running",
+      "note": "Transverse bar, 58 mm, 2 900 mm long; ±180 mm wheel travel, 7 stations",
+      "parent": "hull.main", "material": "metal", "tone": 0.66, "hidden": true,
+      "shape": { "type": "cylinder", "r": 58, "h": 2900, "segments": 12 },
+      "transform": { "pos": [-2650, 640, 0], "rot": [90, 0, 0] },
+      "instances": { "pattern": "linear", "count": 7, "step": [900, 0, 0] },
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "ammo.hullStow", "name": "HULL AMMUNITION STOWAGE", "group": "ammunition",
+      "note": "22 rounds below the turret ring behind an armoured bulkhead",
+      "parent": "hull.main", "material": "metal", "tone": 0.52, "hidden": true,
+      "shape": { "type": "cylinder", "r": 62, "h": 980, "segments": 12 },
+      "transform": { "pos": [560, 800, -700], "rot": [0, 0, 90] },
+      "instances": { "pattern": "grid", "counts": [2, 11],
+                     "steps": [[0, 160, 0], [0, 0, 130]] },
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "crew.driverSeat", "name": "DRIVER'S SEAT", "group": "crew",
+      "note": "Blast-attenuating seat, floor-decoupled, reclines for closed-hatch driving",
+      "parent": "hull.main", "material": "plastic", "tone": 0.4, "hidden": true,
+      "shape": { "type": "extrude", "depth": 560, "profile": [
+        [-260, 0], [300, 0], [300, 90], [-180, 120], [-300, 700], [-420, 680], [-380, 60] ] },
+      "transform": { "pos": [2050, 700, 0], "rot": [0, 90, 0] },
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "turret.basket", "name": "TURRET BASKET", "group": "turret",
+      "note": "Rotating crew floor slung from the ring; 1 960 mm clear diameter",
+      "parent": "turret.ring", "material": "metal", "tone": 0.5, "hidden": true,
+      "shape": { "type": "lathe", "segments": 28, "points": [
+        [0, -880], [980, -880], [980, -840], [940, -840], [940, -40], [980, -40], [980, 0], [0, 0] ] },
+      "transform": { "pos": [0, -50, 0] },
+      "details": [{ "kind": "perforation", "face": "bottom", "rows": 5, "cols": 5, "r": 60, "size": [1400, 1400] }],
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "crew.gunnerSeat", "name": "GUNNER'S SEAT", "group": "crew",
+      "note": "Height-adjustable, mounted to the basket; commander's seat to port",
+      "parent": "turret.basket", "material": "plastic", "tone": 0.4, "hidden": true,
+      "shape": { "type": "box", "size": [420, 620, 420], "radius": 40 },
+      "transform": { "pos": [180, -560, -520] },
+      "instances": { "pattern": "linear", "count": 1, "step": [0, 0, 0], "mirror": "z" },
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "turret.breech", "name": "BREECH RING", "group": "armament",
+      "note": "Semi-automatic vertical sliding block, 820 mm recoil stroke",
+      "parent": "gun.mantlet", "material": "casting", "tone": 0.7, "hidden": true,
+      "shape": { "type": "box", "size": [760, 1180, 700], "radius": 40 },
+      "transform": { "pos": [0, -820, 0] },
+      "details": [{ "kind": "fastener", "face": "top", "cu": 0, "cv": 0, "r": 190, "h": 60 }],
+      "channels": [
+        { "type": "impulse", "target": "pos.y", "amp": -820, "attack": 0.03, "decay": 0.55, "bind": "fire" },
+        { "type": "visibility", "bind": "max(apart, reveal)" }
+      ] },
+
+    { "id": "gun.recuperator", "name": "RECUPERATOR", "group": "armament",
+      "note": "Hydropneumatic recoil brake and recuperator, 820 mm stroke",
+      "parent": "gun.mantlet", "material": "metal", "tone": 0.62, "hidden": true,
+      "shape": { "type": "cylinder", "r": 130, "h": 1500, "segments": 16 },
+      "transform": { "pos": [0, -120, 300] },
+      "instances": { "pattern": "linear", "count": 1, "step": [0, 0, 0], "mirror": "z" },
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "turret.recoilGuard", "name": "RECOIL GUARD", "group": "armament",
+      "note": "Cage over the recoil path; keeps the crew clear of the 820 mm stroke",
+      "parent": "turret.shell", "material": "metal", "tone": 0.46, "hidden": true, "outline": "light",
+      "shape": { "type": "box", "size": [1400, 900, 1000] },
+      "transform": { "pos": [-100, 380, 0] },
+      "details": [
+        { "kind": "grille", "face": "right", "size": [1300, 820], "rows": 4, "cols": 6, "bar": 34 },
+        { "kind": "grille", "face": "left", "size": [1300, 820], "rows": 4, "cols": 6, "bar": 34 }
+      ],
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "ammo.readyRack", "name": "READY ROUND MAGAZINE", "group": "ammunition",
+      "note": "18 rounds in the bustle behind a sliding blast door",
+      "parent": "turret.bustle", "material": "metal", "tone": 0.56, "hidden": true,
+      "shape": { "type": "cylinder", "r": 62, "h": 980, "segments": 12 },
+      "transform": { "pos": [0, -60, -600], "rot": [0, 0, 90] },
+      "instances": { "pattern": "grid", "counts": [2, 9],
+                     "steps": [[0, 200, 0], [0, 0, 150]] },
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] },
+
+    { "id": "ammo.blowOffPanel", "name": "BLOW-OFF PANEL", "group": "ammunition",
+      "note": "Frangible roof panel; vents a magazine deflagration upward, away from the crew",
+      "parent": "turret.bustle", "material": "metal", "tone": 0.44, "hidden": true, "outline": "light",
+      "shape": { "type": "box", "size": [1300, 40, 1800] },
+      "transform": { "pos": [0, 320, 0] },
+      "details": [{ "kind": "rivetRow", "face": "top", "from": [-600, -840], "to": [600, -840], "count": 10, "r": 28 }],
+      "explode": [0, 3400, 0],
+      "channels": [{ "type": "visibility", "bind": "max(apart, reveal)" }] }
+  ],
+
+  "annotations": {
+    "callouts": [
+      { "n": 1,  "text": "120 mm L/44 smoothbore",  "anchor": "gun.barrel" },
+      { "n": 2,  "text": "Composite front cheek",   "anchor": "hull.glacisPlate" },
+      { "n": 3,  "text": "Commander's panoramic",   "anchor": "turret.panoramic" },
+      { "n": 4,  "text": "Smoke dischargers",       "anchor": "turret.smokeBank" },
+      { "n": 5,  "text": "Drive sprocket, 12 teeth","anchor": "run.sprocketR" },
+      { "n": 6,  "text": "Torsion-bar swing arm",   "anchor": "run.swingArmR" },
+      { "n": 7,  "text": "Track link, 196 mm pitch","anchor": "run.trackLinkR" },
+      { "n": 8,  "text": "Compensating idler",      "anchor": "run.idlerR" },
+      { "n": 9,  "text": "Powerpack louvre",        "anchor": "hull.deck" },
+      { "n": 10, "text": "Bustle stowage rack",     "anchor": "turret.bustle" },
+      { "n": 11, "text": "V12 diesel, 1 500 hp",    "anchor": "power.engine" },
+      { "n": 12, "text": "Torsion bar, 7 stations", "anchor": "run.torsionBar" },
+      { "n": 13, "text": "Ready round magazine",    "anchor": "ammo.readyRack" },
+      { "n": 14, "text": "Blow-off panel",          "anchor": "ammo.blowOffPanel" },
+      { "n": 15, "text": "Breech ring, 820 mm recoil", "anchor": "turret.breech" },
+      { "n": 16, "text": "Rotating turret basket",  "anchor": "turret.basket" }
+    ],
+    "dimensions": [
+      { "label": "9 980", "from": [-3653, 0, 1870], "to": [6216, 0, 1870], "offset": [0, 0, 900] },
+      { "label": "2 360", "from": [-3653, 0, 1870], "to": [-3653, 2360, 1870], "offset": [-950, 0, 260] },
+      { "label": "3 600", "from": [-3653, 0, -1870], "to": [-3653, 0, 1870], "offset": [-1750, 0, 0] }
+    ]
+  },
+
+  "views": [
+    { "id": "iso",   "label": "ISO",   "az": 38,  "el": 22 },
+    { "id": "q34f",  "label": "3/4 F", "az": 62,  "el": 18 },
+    { "id": "q34r",  "label": "3/4 R", "az": -55, "el": 20 },
+    { "id": "side",  "label": "SIDE",  "az": 0,  "el": 0, "projection": "orthographic",
+      "caption": "SIDE ELEVATION", "sub": "Scale 1:24 · datum condition · turret squared to hull centreline" },
+    { "id": "front", "label": "FRONT", "az": 90, "el": 0, "projection": "orthographic",
+      "caption": "FRONT ELEVATION", "sub": "Scale 1:24 · viewed on arrow F · skirts fitted" },
+    { "id": "plan",  "label": "PLAN",  "az": 0,  "el": 89, "projection": "orthographic",
+      "caption": "PLAN VIEW", "sub": "Scale 1:24 · section B-B taken on the turret ring datum" },
+    { "id": "secBB", "label": "SEC B-B", "az": 34, "el": 16, "caption": "SECTION B-B",
+      "sub": "cut on the vehicle centreline, looking to starboard · internals exposed",
+      "section": { "plane": "xy", "at": 0, "flip": true },
+      "set": { "reveal": 1, "skirts": 0 } }
+  ],
+
+  "motions": [
+    { "id": "run",     "label": "RUN",     "set": { "scan": 1 } },
+    { "id": "drive",   "label": "DRIVE",   "set": { "speed": 12.2 } },
+    { "id": "fire",    "label": "FIRE",    "set": { "fire": 1, "blast": 1 }, "momentary": true },
+    { "id": "skirts",  "label": "SKIRTS",  "set": { "skirts": 0 } },
+    { "id": "explode", "label": "EXPLODE", "set": { "apart": 1 } },
+    { "id": "smoke",   "label": "SMOKE",   "set": { "smoke": 1 } }
+  ],
+
+  "instruments": [
+    { "label": "TURRET AZIMUTH",    "expr": "mod(360 + 28 * sin(t * 0.377) * scan, 360)", "format": "%05.1f°" },
+    { "label": "GUN ELEVATION",     "expr": "5 * sin(t * 0.314) * scan",                  "format": "%+.1f°" },
+    { "label": "ROAD SPEED",        "expr": "speed",                                      "format": "%.1f km/h" },
+    { "label": "TRACK LINKS / SIDE","expr": "44",                                         "format": "%.0f" },
+    { "label": "SUSPENSION TRAVEL", "expr": "26 + 34 * abs(sin(t * 4.2)) * (speed / 42)", "format": "±%.0f mm" },
+    { "label": "REFRESH",           "expr": "fps",                                        "format": "%.0f fps" }
+  ]
+}

@@ -1,0 +1,136 @@
+name: CI
+
+# Everything here runs with no credentials of any kind. The pipeline's whole
+# design is that authoring, validating and building are offline; if any of these
+# jobs ever needs a key, that is a regression, not a configuration problem.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-checks:
+    name: offline checks · ${{ matrix.os }} · node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # The Chromium is only needed by the render jobs below, not by these.
+      - name: Install (lean — no Chromium)
+        run: npm ci
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+
+      - name: Bundle checks (local HTTP server, no external network)
+        run: node dev/gather-check.mjs
+
+      - name: Evidence checks
+        run: node dev/evidence-check.mjs
+
+      - name: Research checks
+        run: node dev/research-check.mjs
+
+      - name: Validate both examples under --strict
+        run: |
+          node bin/b2d.mjs validate examples/mbt-mk6/spec.json --strict
+          node bin/b2d.mjs validate examples/radial-engine/spec.json --strict
+
+      - name: Build both examples
+        run: |
+          node bin/b2d.mjs build examples/mbt-mk6/spec.json --out out/mbt-mk6
+          node bin/b2d.mjs build examples/radial-engine/spec.json --out out/radial-engine
+
+      # The page is meant to be self-contained. This is the assertion that keeps
+      # it that way: no http(s) URL may appear outside an XML namespace.
+      - name: Assert the emitted pages make no external requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          pages=(out/*/index.html)
+          # A glob that matched nothing must fail, not silently pass.
+          if [ ${#pages[@]} -eq 0 ]; then echo "::error::no pages were built"; exit 1; fi
+          fail=0
+          for f in "${pages[@]}"; do
+            leaks=$(grep -oE 'https?://[A-Za-z0-9./_-]+' "$f" | grep -v 'www.w3.org' | sort -u || true)
+            if [ -n "$leaks" ]; then
+              echo "::error file=$f::external reference(s) found:"; echo "$leaks"; fail=1
+            fi
+          done
+          echo "checked ${#pages[@]} page(s)"
+          exit $fail
+
+  render-checks:
+    name: render checks · ubuntu · node 22
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install (full — pulls Chromium for headless rendering)
+        run: npm ci
+
+      - name: Selftest every view and motion
+        run: |
+          node bin/b2d.mjs selftest examples/mbt-mk6/spec.json
+          node bin/b2d.mjs selftest examples/radial-engine/spec.json
+
+      - name: The assembly genuinely comes apart and reveals its interior
+        run: node dev/explode-check.mjs out/mbt-mk6/index.html --motion explode --section secBB
+
+      - name: Leader lines behave in 3D
+        run: node dev/anchor-check.mjs out/mbt-mk6/index.html --motion drive
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sheet-screenshots
+          path: out/*/shots/*.png
+          retention-days: 14
+
+  plugin-manifest:
+    name: plugin manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Manifests are well-formed and agree with each other
+        run: |
+          node -e "
+          const fs = require('fs');
+          const plugin = JSON.parse(fs.readFileSync('.claude-plugin/plugin.json', 'utf8'));
+          const market = JSON.parse(fs.readFileSync('.claude-plugin/marketplace.json', 'utf8'));
+          const entry = market.plugins.find(p => p.name === plugin.name);
+          if (!entry) throw new Error('marketplace.json has no entry for ' + plugin.name);
+          for (const f of ['name', 'description', 'version', 'author']) {
+            if (!plugin[f]) throw new Error('plugin.json is missing ' + f);
+          }
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          if (pkg.version !== plugin.version) {
+            throw new Error('version drift: package.json ' + pkg.version + ' vs plugin.json ' + plugin.version);
+          }
+          const placeholder = JSON.stringify({ plugin, market }).match(/YOUR-[A-Z-]+/g);
+          if (placeholder) throw new Error('unfilled placeholder(s): ' + [...new Set(placeholder)].join(', '));
+          console.log('manifests agree · v' + plugin.version);
+          "
+      - name: The skill is where the loader expects it
+        run: test -f skills/blueprint-3d-sheet/SKILL.md

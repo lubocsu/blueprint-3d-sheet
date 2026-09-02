@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>hatch lab</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #eaeef2; }
+    #c { display: block; width: 100vw; height: 100vh; }
+    #labels { position: fixed; inset: 0; pointer-events: none; }
+    .lbl {
+      position: absolute; transform: translate(-50%, 0);
+      font: 600 11px/1 ui-monospace, "JetBrains Mono", Consolas, monospace;
+      letter-spacing: .12em; text-transform: uppercase; color: #5e6b87;
+    }
+    #hud {
+      position: fixed; left: 12px; bottom: 12px;
+      font: 600 12px ui-monospace, Consolas, monospace; color: #1b2745;
+      background: #f0f3f6cc; border: 1px solid #1b2745; padding: 6px 10px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="labels"></div>
+  <div id="hud"></div>
+  <script src="./hatch-lab.bundle.js"></script>
+</body>
+</html>

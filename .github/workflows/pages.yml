@@ -1,0 +1,89 @@
+name: Deploy demo sheets to Pages
+
+# The repository stores specs, not pages. Every sheet is rebuilt here from
+# examples/*/spec.json, so `out/` never enters git history and the repo does
+# not grow by ~700 kB on every rebuild.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'examples/**'
+      - 'src/**'
+      - 'templates/**'
+      - 'bin/**'
+      - 'scripts/make-index.mjs'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never cancel a deploy midway; queue instead.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `build` never launches a browser, so the Chromium download is pure cost.
+      - name: Install (no Chromium — build does not need it)
+        run: npm ci
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+
+      - name: Build every example sheet
+        run: |
+          set -euo pipefail
+          # make-index owns the list; the smoke rig fails the density gate on
+          # purpose and must not take the whole deploy down with it.
+          for name in $(node scripts/make-index.mjs --list); do
+            echo "building $name"
+            node bin/b2d.mjs build "examples/$name/spec.json" --out "site/$name"
+          done
+
+      - name: Write the index page
+        run: node scripts/make-index.mjs site
+
+      - name: Refuse to publish a page that phones home
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          pages=(site/*/index.html)
+          # A glob that matched nothing must fail, not silently pass.
+          if [ ${#pages[@]} -eq 0 ]; then echo "::error::no pages were built"; exit 1; fi
+          fail=0
+          for f in "${pages[@]}"; do
+            leaks=$(grep -oE 'https?://[A-Za-z0-9./_-]+' "$f" | grep -v 'www.w3.org' | sort -u || true)
+            if [ -n "$leaks" ]; then
+              echo "::error file=$f::external reference(s) found:"; echo "$leaks"; fail=1
+            fi
+          done
+          echo "checked ${#pages[@]} page(s)"
+          exit $fail
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

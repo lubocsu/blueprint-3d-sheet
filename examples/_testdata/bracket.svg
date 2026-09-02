@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <text x="20" y="20">MOUNTING BRACKET</text>
+  <text x="20" y="40">MATERIAL: 6 mm MS PLATE</text>
+  <text x="200" y="290">180</text>
+  <polygon points="20,60 200,60 200,100 60,100 60,220 20,220" fill="none" stroke="#000"/>
+  <rect x="240" y="60" width="120" height="160"/>
+  <circle cx="40" cy="200" r="12"/>
+  <circle cx="40" cy="80" r="12"/>
+  <circle cx="300" cy="140" r="26"/>
+  <path d="M 240 240 L 360 240 L 360 270 L 240 270 Z"/>
+</svg>

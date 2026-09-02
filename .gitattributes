@@ -1,0 +1,6 @@
+# Store text as LF. The CLI carries a shebang and CI runs on Linux, so a CRLF
+# checkout would break `bin/b2d.mjs` outright.
+* text=auto eol=lf
+
+*.webp binary
+*.png  binary
