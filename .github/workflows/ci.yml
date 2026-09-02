@@ -134,3 +134,29 @@ jobs:
           "
       - name: The skill is where the loader expects it
         run: test -f skills/blueprint-3d-sheet/SKILL.md
+
+      # Bilingual docs drift silently: someone edits one README and the other
+      # keeps asserting last month's behaviour. Section count is a crude but
+      # effective tripwire — a new section on one side must appear on both.
+      - name: The two READMEs still match
+        run: |
+          node -e "
+          const fs = require('fs');
+          const en = fs.readFileSync('README.md', 'utf8');
+          const zh = fs.readFileSync('README.zh-CN.md', 'utf8');
+          const secs = (t) => t.split('
+').filter(l => l.startsWith('## ')).length;
+          if (secs(en) !== secs(zh)) {
+            throw new Error('section drift: README.md has ' + secs(en) + ', README.zh-CN.md has ' + secs(zh));
+          }
+          if (!en.includes('README.zh-CN.md')) throw new Error('README.md does not link to the Chinese version');
+          if (!zh.includes('README.md')) throw new Error('README.zh-CN.md does not link back to English');
+          for (const [name, t] of [['README.md', en], ['README.zh-CN.md', zh]]) {
+            for (const img of t.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)) {
+              if (!/^https?:/.test(img[1]) && !fs.existsSync(img[1])) {
+                throw new Error(name + ' references a missing image: ' + img[1]);
+              }
+            }
+          }
+          console.log('READMEs agree - ' + secs(en) + ' sections each');
+          "
