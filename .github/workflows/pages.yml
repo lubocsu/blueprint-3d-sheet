@@ -73,9 +73,12 @@ jobs:
           echo "checked ${#pages[@]} page(s)"
           exit $fail
 
-      # `enablement` turns Pages on if it is not configured yet. Without it the
-      # very first run of this workflow fails with a 404 on a fresh repository —
-      # and so does every fork, before anyone has visited Settings > Pages.
+      # On a repository where Pages has never been configured this step fails
+      # with a 404. `enablement` asks the action to turn Pages on itself, but it
+      # only works with a token carrying Pages-write or administration-write —
+      # the default GITHUB_TOKEN does not, so it is a best-effort fallback and
+      # NOT a substitute for setting Settings > Pages > Source to GitHub Actions
+      # once per repository. Forks must do that manually; the README says so.
       - uses: actions/configure-pages@v5
         with:
           enablement: true

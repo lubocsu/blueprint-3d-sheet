@@ -281,7 +281,8 @@ dev/                  hatch-lab shader harness, headless screenshot, smoothness 
                       explode probes, offline evidence + research checks, static server
 ```
 
-The probes assert rather than print, and each one guards a claim made above:
+Every probe asserts and exits non-zero on a violation, so each one actually
+guards the claim made above rather than reporting a number nobody reads:
 
 ```bash
 node dev/smoothness.mjs   out/mbt-mk6/index.html               # annotation travel during a spin
@@ -294,6 +295,45 @@ node dev/research-check.mjs    # triggers, cache, dossier rendering, degrade pat
 The last two deliberately do **not** cover a live search: that needs
 credentials, and asserting it works without running it would be the exact kind
 of unchecked claim the feature exists to prevent.
+
+## Developing
+
+The repository is the single source of truth. Register it as a local
+marketplace and the installed plugin reads the working tree, so an edit is live
+in the next session without a push:
+
+```powershell
+claude plugin marketplace add C:\path\to\blueprint-3d-sheet
+claude plugin install blueprint-3d-sheet@blueprint-3d-sheet
+```
+
+If you fork this and want the demo site, set **Settings > Pages > Source** to
+**GitHub Actions** once. The workflow asks the action to enable Pages itself,
+but that needs a token carrying Pages-write permission, which the default
+`GITHUB_TOKEN` does not have.
+
+The loop, in PowerShell (`&&` needs PowerShell 7; on 5.1 use `;`):
+
+```powershell
+node scripts/check-manifests.mjs; if ($?) { node scripts/check-readmes.mjs }
+node bin/b2d.mjs validate examples/mbt-mk6/spec.json --strict
+git add -A; git commit -m "..."; git push
+```
+
+or in bash:
+
+```bash
+node scripts/check-manifests.mjs && node scripts/check-readmes.mjs
+node bin/b2d.mjs validate examples/mbt-mk6/spec.json --strict
+git add -A && git commit -m "..." && git push
+```
+
+A local marketplace serves the *working tree*, including changes you have not
+committed. Before a release, verify a clean clone so "it works here" is not
+resting on an unstaged file.
+
+`git push` to `main` deploys the demo site, so a broken `main` is a broken
+demo. Work on a branch if you are changing the renderer.
 
 ## Examples
 

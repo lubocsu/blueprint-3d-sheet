@@ -97,8 +97,16 @@ jobs:
       - name: The assembly genuinely comes apart and reveals its interior
         run: node dev/explode-check.mjs out/mbt-mk6/index.html --motion explode --section secBB
 
+      # Both examples, because the two disagree in a useful way: 10/16 anchors
+      # slide on the tank and 12/12 on the engine, so a regression that pinned
+      # anchors would still clear the tank's floor alone.
       - name: Leader lines behave in 3D
-        run: node dev/anchor-check.mjs out/mbt-mk6/index.html --motion drive
+        run: |
+          node dev/anchor-check.mjs out/mbt-mk6/index.html --motion drive
+          node dev/anchor-check.mjs out/radial-engine/index.html --motion cruise
+
+      - name: The annotation layer holds still while the picture moves
+        run: node dev/smoothness.mjs out/mbt-mk6/index.html
 
       - uses: actions/upload-artifact@v4
         if: always()

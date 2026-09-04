@@ -25,7 +25,12 @@ const flag = (n, d) => {
 const degPerFrame = flag('deg', 1);
 const frames = flag('frames', 240);
 
-const browser = await puppeteer.launch({ headless: true, args: CHROME_FLAGS });
+// A single page.evaluate here drives hundreds of animation frames, each with an
+// annotation re-solve. Puppeteer's default protocolTimeout is 180 s, which is
+// ample on a GPU and not on a CI runner falling back to software rendering -
+// where this surfaces as an opaque ProtocolError rather than a slow pass.
+const PROTOCOL_TIMEOUT = 900000;
+const browser = await puppeteer.launch({ headless: true, args: CHROME_FLAGS, protocolTimeout: PROTOCOL_TIMEOUT });
 const page = await browser.newPage();
 await page.setViewport({ width: 1600, height: 950, deviceScaleFactor: 1 });
 await page.goto(pathToFileURL(file).href, { waitUntil: 'load' });
@@ -72,9 +77,42 @@ const res = await page.evaluate(async ({ degPerFrame, frames }) => {
   };
 }, { degPerFrame, frames });
 
+await browser.close();
+
 console.log(`spin ${degPerFrame}deg/frame x ${frames} frames, ${res.samples} samples`);
 console.log(`  median ${res.median.toFixed(1)}px  p95 ${res.p95.toFixed(1)}px  ` +
             `p99 ${res.p99.toFixed(1)}px  max ${res.max.toFixed(1)}px`);
 console.log(`  jumps over 40px: ${res.over40} (${(100 * res.over40 / Math.max(res.samples, 1)).toFixed(2)}%)`);
 
-await browser.close();
+/* ---------------------------------------------------------------- assert */
+
+// This script used to print these numbers and exit 0 whatever they said. The
+// whole point of deferred regeneration is that the layer does not move while
+// the picture does, so that claim is now guarded rather than merely reported.
+//
+// The layer is frozen during a spin, so the honest expectation is exactly zero
+// movement. One pixel of headroom covers the solver's own rounding without
+// admitting the failure this measures: annotations sweeping across the drawing.
+const MAX_JUMP_PX = 1;
+
+let failures = 0;
+if (!res.samples) {
+  console.log(`
+  [31mx[0m no samples collected - nothing was actually measured`);
+  failures++;
+}
+for (const [label, value] of [['median', res.median], ['p95', res.p95], ['p99', res.p99], ['max', res.max]]) {
+  if (value >= MAX_JUMP_PX) {
+    console.log(`  [31mx[0m ${label} travel ${value.toFixed(1)}px exceeds ${MAX_JUMP_PX}px - ` +
+                `the annotation layer is moving while the picture moves`);
+    failures++;
+  }
+}
+
+if (failures) {
+  console.log(`
+[31msmoothness check failed[0m`);
+  process.exit(1);
+}
+console.log(`
+[32mannotation layer held still[0m`);

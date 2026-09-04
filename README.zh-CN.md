@@ -231,7 +231,8 @@ dev/                  剖面线着色器实验台、无头截图、平滑度 + �
                       离线证据与调研检查、静态服务器
 ```
 
-这些探针是做断言而不是打印，每一个都守着上文的一项主张：
+每个探针都做断言，不合格就以非零退出码结束 —— 这样它才是真的在守着上文那项主张，
+而不只是打印一个没人看的数字：
 
 ```bash
 node dev/smoothness.mjs   out/mbt-mk6/index.html               # 旋转期间的标注位移
@@ -243,6 +244,42 @@ node dev/research-check.mjs    # 触发条件、缓存、档案渲染、降级�
 
 最后两个刻意**不**覆盖真实联网搜索：那需要凭据，而在没跑过的情况下断言它能用，
 恰恰就是这个功能本身要防止的那种未经核实的声称。
+
+## 开发
+
+仓库是唯一真源。把它注册成本地 marketplace，装上的插件读的就是工作区，
+所以改完下次会话即生效，不必推送：
+
+```powershell
+claude plugin marketplace add C:\path\to\blueprint-3d-sheet
+claude plugin install blueprint-3d-sheet@blueprint-3d-sheet
+```
+
+fork 本仓库后若想要演示站点，需在 **Settings > Pages > Source** 里手工选一次
+**GitHub Actions**。workflow 里虽然让 action 自行开启 Pages，但那需要带 Pages-write
+权限的 token，默认的 `GITHUB_TOKEN` 没有。
+
+日常循环，PowerShell 写法（`&&` 要 PowerShell 7；5.1 上用 `;`）：
+
+```powershell
+node scripts/check-manifests.mjs; if ($?) { node scripts/check-readmes.mjs }
+node bin/b2d.mjs validate examples/mbt-mk6/spec.json --strict
+git add -A; git commit -m "..."; git push
+```
+
+bash 写法：
+
+```bash
+node scripts/check-manifests.mjs && node scripts/check-readmes.mjs
+node bin/b2d.mjs validate examples/mbt-mk6/spec.json --strict
+git add -A && git commit -m "..." && git push
+```
+
+本地 marketplace 服务的是**工作区**，包含你尚未提交的改动。发版前先验证一份干净克隆，
+免得"我这儿能跑"其实是靠某个没提交的文件撑着。
+
+推送到 `main` 会部署演示站点，所以 `main` 一坏，线上 demo 就跟着坏。
+要改渲染这类容易出事的地方，请开分支。
 
 ## 示例
 
