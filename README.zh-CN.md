@@ -263,10 +263,13 @@ HEAD 提交上 —— 改仓库*不会*改变 Claude 加载的内容，提交了
 - 想在同一版本号下装入当前代码，就卸载再装一次。这就是迭代循环：
 
 ```powershell
-git commit -am "..."      # 未提交的改动不会被拷贝，拷的是 HEAD
 claude plugin uninstall blueprint-3d-sheet@blueprint-3d-sheet
 claude plugin install blueprint-3d-sheet@blueprint-3d-sheet -y
 ```
+
+安装拷贝的是**工作区**，未提交的改动也一并带上，所以一个实验不必先提交就能试。
+`installed_plugins.json` 里记的 `gitCommitSha` 只是"安装时 HEAD 恰好是什么"的标签 ——
+它不是拷贝的来源，工作区不干净时这个标签会误导人。
 
 然后重启会话 —— skill 是在会话启动时读取的。
 

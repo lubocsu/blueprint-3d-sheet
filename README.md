@@ -318,10 +318,14 @@ does committing. Two things follow:
   That is the iteration loop:
 
 ```powershell
-git commit -am "..."      # uncommitted changes are NOT copied; HEAD is
 claude plugin uninstall blueprint-3d-sheet@blueprint-3d-sheet
 claude plugin install blueprint-3d-sheet@blueprint-3d-sheet -y
 ```
+
+Installing copies the **working tree**, uncommitted changes included, so an
+experiment can be tried without committing it. The `gitCommitSha` recorded in
+`installed_plugins.json` is only a label for whatever HEAD happened to be — it
+is not what was copied, and a dirty tree makes it misleading.
 
 then restart the session, because skills are read at session start.
 
