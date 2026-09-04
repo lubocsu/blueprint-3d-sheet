@@ -247,13 +247,28 @@ node dev/research-check.mjs    # 触发条件、缓存、档案渲染、降级�
 
 ## 开发
 
-仓库是唯一真源。把它注册成本地 marketplace，装上的插件读的就是工作区，
-所以改完下次会话即生效，不必推送：
+仓库是唯一真源。把它注册成本地 marketplace，插件就从你自己的检出构建，
+而不是从 GitHub 拉：
 
 ```powershell
 claude plugin marketplace add C:\path\to\blueprint-3d-sheet
 claude plugin install blueprint-3d-sheet@blueprint-3d-sheet
 ```
+
+**安装动作会拍一张快照。** 插件被拷进 `~/.claude/plugins/cache/`，并钉死在安装那一刻的
+HEAD 提交上 —— 改仓库*不会*改变 Claude 加载的内容，提交了也不会。由此有两条结论：
+
+- `claude plugin update` 比较的是**版本号**，所以无论代码走出多远，它都会回答"已是最新版"。
+  只有 `plugin.json` 里的版本变了，它才会真的刷新。
+- 想在同一版本号下装入当前代码，就卸载再装一次。这就是迭代循环：
+
+```powershell
+git commit -am "..."      # 未提交的改动不会被拷贝，拷的是 HEAD
+claude plugin uninstall blueprint-3d-sheet@blueprint-3d-sheet
+claude plugin install blueprint-3d-sheet@blueprint-3d-sheet -y
+```
+
+然后重启会话 —— skill 是在会话启动时读取的。
 
 fork 本仓库后若想要演示站点，需在 **Settings > Pages > Source** 里手工选一次
 **GitHub Actions**。workflow 里虽然让 action 自行开启 Pages，但那需要带 Pages-write

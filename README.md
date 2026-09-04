@@ -299,13 +299,31 @@ of unchecked claim the feature exists to prevent.
 ## Developing
 
 The repository is the single source of truth. Register it as a local
-marketplace and the installed plugin reads the working tree, so an edit is live
-in the next session without a push:
+marketplace so the plugin is built from your own checkout rather than GitHub:
 
 ```powershell
 claude plugin marketplace add C:\path\to\blueprint-3d-sheet
 claude plugin install blueprint-3d-sheet@blueprint-3d-sheet
 ```
+
+**Installing takes a snapshot.** The plugin is copied into
+`~/.claude/plugins/cache/` and pinned to the commit that was HEAD at install
+time — editing the repository does *not* change what Claude loads, and neither
+does committing. Two things follow:
+
+- `claude plugin update` compares **version numbers**, so it reports "already at
+  the latest version" however far the code has moved. It refreshes the plugin
+  only when `plugin.json` carries a new version.
+- To pick up your current code at the same version, uninstall and install again.
+  That is the iteration loop:
+
+```powershell
+git commit -am "..."      # uncommitted changes are NOT copied; HEAD is
+claude plugin uninstall blueprint-3d-sheet@blueprint-3d-sheet
+claude plugin install blueprint-3d-sheet@blueprint-3d-sheet -y
+```
+
+then restart the session, because skills are read at session start.
 
 If you fork this and want the demo site, set **Settings > Pages > Source** to
 **GitHub Actions** once. The workflow asks the action to enable Pages itself,
