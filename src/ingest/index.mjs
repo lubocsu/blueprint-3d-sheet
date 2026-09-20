@@ -21,11 +21,11 @@ import { initBundle, loadBundleForIngest } from './bundle.mjs';
 import { hasCredentials, CREDENTIAL_HINT } from './anthropic.mjs';
 import { scoreEvidence, formatEvidence, explainEvidence } from './evidence.mjs';
 import { measureGrounding, describeGrounding } from '../spec/grounding.mjs';
+import { RASTER, VECTOR, classifyPath, assertReadableBrief } from './source.mjs';
+import { dwgToDxf } from './dwg.mjs';
 
 const run = promisify(execFile);
 
-const RASTER = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tif', '.tiff']);
-const VECTOR = new Set(['.dxf', '.svg']);
 const MEDIA_TYPE = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' };
 
 /** Longest edge the vision path sends. Bigger costs tokens without adding detail. */
@@ -107,20 +107,38 @@ export async function ingest(input, {
   bundle = null,
 } = {}) {
   const isFile = typeof input === 'string' && existsSync(input) && input.length < 4096;
-  const ext = isFile ? extname(input).toLowerCase() : '';
-
-  let kind = 'brief';
-  if (isFile && RASTER.has(ext)) kind = 'raster';
-  else if (isFile && VECTOR.has(ext)) kind = 'vector';
+  let { kind } = classifyPath(input, isFile);
 
   let brief = null;
   let extracted = null;
   let vector = null;
   let image = null;
   let cleanupDir = null;
+  let cleanupDwg = null;
+  // The path the vector reader actually parses: the input itself for DXF/SVG,
+  // a converted temp file for DWG.
+  let vectorPath = input;
+
+  // A closed format we can convert is handled before anything else looks at it,
+  // so everything downstream sees an ordinary vector input.
+  if (kind === 'convertible') {
+    const converted = await dwgToDxf(input, { verbose });
+    vectorPath = converted.dxfPath;
+    cleanupDwg = converted.cleanup;
+    kind = 'vector';
+    if (verbose) process.stderr.write(`  converted with ${converted.converter}\n`);
+  }
 
   if (kind === 'brief') {
-    brief = isFile ? await readFile(input, 'utf8') : String(input);
+    if (isFile) {
+      // Read as BYTES and check before decoding. Reading straight to utf8 is
+      // what let a 29 MB binary drawing be scored as a written brief.
+      const bytes = await readFile(input);
+      assertReadableBrief(input, bytes);
+      brief = bytes.toString('utf8');
+    } else {
+      brief = String(input);
+    }
     if (!brief.trim()) throw new Error('the brief is empty');
   } else if (kind === 'raster') {
     const prepared = await prepareImage(input);
@@ -131,9 +149,9 @@ export async function ingest(input, {
     // The whole extraction is kept, not just the digest: the evidence scorer
     // reads the label text and the true extent, and those are exactly what tell
     // it a CAD file is well documented rather than merely accurate.
-    vector = await extractVector(input);
+    vector = await extractVector(vectorPath);
     extracted = vector.digest;
-    image = await renderVector(input);
+    image = await renderVector(vectorPath);
     brief = notes ?? null;
     if (verbose) {
       process.stderr.write(`  extracted ${vector.outlines.length} outlines, ` +
@@ -245,12 +263,15 @@ export async function ingest(input, {
 
   /* ---- generate ------------------------------------------------------------- */
 
-  if (!hasCredentials()) {
+  // Inside the try, so a missing key does not leak the temp directories the
+  // stages above created — a converted DWG in particular can be large.
+  const requireCredentials = () => {
+    if (hasCredentials()) return;
     throw new Error(
       `${CREDENTIAL_HINT}. \`b2d ingest\` still needs model credentials to generate spec.json. ` +
       'For the zero-key path, run bundle select, read dossier.json plus downloads/*.txt, ' +
       'author spec.json manually as the agent, then run validate/build/selftest.');
-  }
+  };
 
   const buildContent = (d) => {
     const text = buildUserPrompt({ kind, brief, notes, extracted, dossier: d });
@@ -264,6 +285,7 @@ export async function ingest(input, {
   };
 
   try {
+    requireCredentials();
     const spec = await generateSpec({
       archetype: chosen,
       userContent: buildContent(dossier),
@@ -308,6 +330,7 @@ export async function ingest(input, {
     return spec;
   } finally {
     if (cleanupDir) await rm(cleanupDir, { recursive: true, force: true }).catch(() => {});
+    if (cleanupDwg) await cleanupDwg();
     for (const dir of referenceDirs) await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }
