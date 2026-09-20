@@ -18,31 +18,35 @@
  * like this they are mostly the filled interiors of letters, which the outlines
  * already describe).
  *
- * A drawing SET is often tiled across model space — a dozen sheets in a row —
- * so the whole extent renders as an unreadable strip. `--region` crops to one
- * sheet, which is what makes the lettering legible enough to read back.
- *
  *   node dev/dxf-preview.mjs <in.dxf> <out.png> [--width 4000] [--hatch]
- *   node dev/dxf-preview.mjs in.dxf sheet2.png --region 780,0,1650,600 --width 5000
+ *   node dev/dxf-preview.mjs in.dxf sheet.png --region 780,0,1650,600 --width 5000
+ *   node dev/dxf-preview.mjs in.dxf sheets/s.png --tiles auto --width 5200
+ *
+ * A drawing SET is often tiled across model space — a dozen sheets in a row — so
+ * the full extent renders as an unreadable strip. `--region` crops to one sheet;
+ * `--tiles auto` finds the gutters between sheets and writes one PNG per sheet
+ * from a SINGLE parse, which is most of the wall clock when the file is large.
  */
 
 import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { writeFile, mkdir, rm } from 'node:fs/promises';
-import { mkdtemp } from 'node:fs/promises';
+import { writeFile, mkdir, rm, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const args = process.argv.slice(2);
-const positional = args.filter((a, i) => !a.startsWith('--') && !(i > 0 && args[i - 1].startsWith('--') && !/^--(hatch)$/.test(args[i - 1])));
+const FLAGS_WITH_VALUES = new Set(['width', 'region', 'tiles', 'tile-gap', 'max-entities']);
+const positional = args.filter((a, i) =>
+  !a.startsWith('--') &&
+  !(i > 0 && args[i - 1].startsWith('--') && FLAGS_WITH_VALUES.has(args[i - 1].slice(2))));
 const flag = (n, d) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : d; };
 const has = (n) => args.includes(`--${n}`);
 
 const input = positional[0];
 const output = positional[1];
 if (!input || !output) {
-  console.error('usage: node dev/dxf-preview.mjs <in.dxf> <out.png> [--width 4000] [--hatch]');
+  console.error('usage: node dev/dxf-preview.mjs <in.dxf> <out.png> [--width N] [--region x0,y0,x1,y1] [--tiles auto] [--hatch]');
   process.exit(1);
 }
 
@@ -53,7 +57,7 @@ const MAX_ENTITIES = Number(flag('max-entities', 2_000_000));
 /* ------------------------------------------------------------------- parse */
 
 /**
- * Collect polylines as flat [x0,y0,x1,y1,...] runs.
+ * Collect polylines as flat [x0,y0,x1,y1,…] runs.
  *
  * A DXF is a flat stream of (code, value) pairs; an entity ends when the next
  * `0` arrives. Vertices are codes 10/20, which repeat — so they accumulate per
@@ -69,25 +73,18 @@ async function collect(path) {
   let type = null;
   let xs = [], ys = [];
   let cx = 0, cy = 0, r = 0;
-  let closed = false;
-  let count = 0;
-  let skipped = 0;
+  let count = 0, skipped = 0;
 
   const flush = () => {
-    if (type === 'LWPOLYLINE' || type === 'POLYLINE') {
-      if (xs.length >= 2) {
-        const flat = new Float32Array(xs.length * 2);
-        for (let i = 0; i < xs.length; i++) { flat[i * 2] = xs[i]; flat[i * 2 + 1] = ys[i]; }
-        polys.push({ pts: flat, closed });
-      }
-    } else if (type === 'CIRCLE' && r > 0) {
-      circles.push({ cx, cy, r });
-    } else if (type === 'HATCH' && WITH_HATCH && xs.length >= 2) {
+    const wantPoly = type === 'LWPOLYLINE' || type === 'POLYLINE' || (type === 'HATCH' && WITH_HATCH);
+    if (wantPoly && xs.length >= 2) {
       const flat = new Float32Array(xs.length * 2);
       for (let i = 0; i < xs.length; i++) { flat[i * 2] = xs[i]; flat[i * 2 + 1] = ys[i]; }
-      polys.push({ pts: flat, closed: true });
+      polys.push(flat);
+    } else if (type === 'CIRCLE' && r > 0) {
+      circles.push({ cx, cy, r });
     }
-    xs = []; ys = []; closed = false; r = 0;
+    xs = []; ys = []; r = 0;
   };
 
   for await (const raw of rl) {
@@ -100,9 +97,7 @@ async function collect(path) {
       if (value === 'SECTION') { pendingSection = true; type = null; continue; }
       if (value === 'ENDSEC') { section = null; type = null; continue; }
       type = section === 'ENTITIES' ? value.trim() : null;
-      if (type) {
-        if (++count > MAX_ENTITIES) { skipped++; type = null; }
-      }
+      if (type && ++count > MAX_ENTITIES) { skipped++; type = null; }
       continue;
     }
     if (pendingSection && code === '2') { section = value.trim(); pendingSection = false; continue; }
@@ -111,9 +106,6 @@ async function collect(path) {
     if (code === '10') { if (type === 'CIRCLE') cx = Number(value); else xs.push(Number(value)); }
     else if (code === '20') { if (type === 'CIRCLE') cy = Number(value); else ys.push(Number(value)); }
     else if (code === '40' && type === 'CIRCLE') r = Number(value);
-    else if (code === '70' && (type === 'LWPOLYLINE' || type === 'POLYLINE')) {
-      closed = (Number(value) & 1) === 1;
-    }
   }
   flush();
   return { polys, circles, skipped };
@@ -124,7 +116,6 @@ const t0 = Date.now();
 const { polys, circles, skipped } = await collect(resolve(input));
 console.error(`  ${polys.length} polyline(s), ${circles.length} circle(s) in ${((Date.now() - t0) / 1000).toFixed(1)}s` +
               (skipped ? `, ${skipped} entity(ies) past --max-entities` : ''));
-
 if (!polys.length && !circles.length) {
   console.error('nothing drawable found');
   process.exit(1);
@@ -132,62 +123,107 @@ if (!polys.length && !circles.length) {
 
 /* -------------------------------------------------------------------- bbox */
 
-let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
-for (const p of polys) {
-  for (let i = 0; i < p.pts.length; i += 2) {
-    const x = p.pts[i], y = p.pts[i + 1];
-    if (x < minX) minX = x; if (x > maxX) maxX = x;
-    if (y < minY) minY = y; if (y > maxY) maxY = y;
+let fullMinX = Infinity, fullMinY = Infinity, fullMaxX = -Infinity, fullMaxY = -Infinity;
+for (const pts of polys) {
+  for (let i = 0; i < pts.length; i += 2) {
+    const x = pts[i], y = pts[i + 1];
+    if (x < fullMinX) fullMinX = x; if (x > fullMaxX) fullMaxX = x;
+    if (y < fullMinY) fullMinY = y; if (y > fullMaxY) fullMaxY = y;
   }
 }
 for (const c of circles) {
-  minX = Math.min(minX, c.cx - c.r); maxX = Math.max(maxX, c.cx + c.r);
-  minY = Math.min(minY, c.cy - c.r); maxY = Math.max(maxY, c.cy + c.r);
+  fullMinX = Math.min(fullMinX, c.cx - c.r); fullMaxX = Math.max(fullMaxX, c.cx + c.r);
+  fullMinY = Math.min(fullMinY, c.cy - c.r); fullMaxY = Math.max(fullMaxY, c.cy + c.r);
 }
-console.error(`  bbox  x ${minX.toFixed(1)} .. ${maxX.toFixed(1)}   y ${minY.toFixed(1)} .. ${maxY.toFixed(1)}`);
+console.error(`  bbox  x ${fullMinX.toFixed(1)} .. ${fullMaxX.toFixed(1)}   y ${fullMinY.toFixed(1)} .. ${fullMaxY.toFixed(1)}`);
 
-// Crop to one sheet of a tiled set. Given in drawing units, which is what the
-// bbox above reports, so a region can be read straight off a full-extent pass.
-const region = flag('region', null);
-if (region) {
-  const [rx0, ry0, rx1, ry1] = String(region).split(',').map(Number);
-  if ([rx0, ry0, rx1, ry1].some((n) => !Number.isFinite(n))) {
-    console.error('--region takes x0,y0,x1,y1 in drawing units');
-    process.exit(1);
+/* -------------------------------------------------------------------- tiles */
+
+/**
+ * Split a tiled sheet set on its gutters.
+ *
+ * A set laid out in a row leaves a genuinely empty band between sheets. Binning
+ * X coverage and cutting at empty runs wider than `--tile-gap` finds them
+ * without being told the sheet size — which matters, because the pitch is
+ * whatever the draughtsman used rather than a standard.
+ */
+function findTiles(gap) {
+  const BIN = 2;
+  const bins = new Uint8Array(Math.ceil((fullMaxX - fullMinX) / BIN) + 1);
+  const mark = (x0, x1) => {
+    const a = Math.max(0, Math.floor((x0 - fullMinX) / BIN));
+    const b = Math.min(bins.length - 1, Math.ceil((x1 - fullMinX) / BIN));
+    for (let i = a; i <= b; i++) bins[i] = 1;
+  };
+  for (const pts of polys) {
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < pts.length; i += 2) {
+      if (pts[i] < lo) lo = pts[i];
+      if (pts[i] > hi) hi = pts[i];
+    }
+    mark(lo, hi);
   }
-  minX = Math.min(rx0, rx1); maxX = Math.max(rx0, rx1);
-  minY = Math.min(ry0, ry1); maxY = Math.max(ry0, ry1);
-  console.error(`  cropped to x ${minX} .. ${maxX}   y ${minY} .. ${maxY}`);
+  for (const c of circles) mark(c.cx - c.r, c.cx + c.r);
+
+  const runs = [];
+  const gapBins = Math.max(1, Math.round(gap / BIN));
+  let start = -1, empty = 0;
+  for (let i = 0; i < bins.length; i++) {
+    if (bins[i]) { if (start < 0) start = i; empty = 0; continue; }
+    if (start < 0) continue;
+    if (++empty >= gapBins) {
+      runs.push([fullMinX + start * BIN, fullMinX + (i - empty) * BIN]);
+      start = -1; empty = 0;
+    }
+  }
+  if (start >= 0) runs.push([fullMinX + start * BIN, fullMaxX]);
+
+  // Discard slivers: a stray leader outside the frames is not a sheet.
+  const span = fullMaxX - fullMinX;
+  return runs.filter(([a, b]) => (b - a) > span * 0.01);
 }
-
-const w = maxX - minX, h = maxY - minY;
-console.error(`  extent ${w.toFixed(1)} x ${h.toFixed(1)} (drawing units)`);
-
-const width = WIDTH;
-const height = Math.max(1, Math.round((h / w) * width));
 
 /* ------------------------------------------------------------------ render */
 
-// Geometry goes to the page as a binary payload rather than as JSON: a million
-// coordinates through JSON.stringify is both slow and enormous.
-const chunks = [];
-for (const p of polys) {
-  chunks.push(new Uint32Array([p.pts.length / 2]).buffer, p.pts.buffer);
-}
-const flatLen = chunks.reduce((n, b) => n + b.byteLength, 0);
-const payload = Buffer.alloc(flatLen);
-{
+const puppeteer = (await import('puppeteer')).default;
+const { CHROME_FLAGS } = await import('./shot.mjs');
+
+/** One canvas page per region. The geometry payload is rebuilt per region so a
+ *  cropped sheet only ships the polylines it actually needs. */
+async function renderRegion(browser, work, [minX, minY, maxX, maxY], outPath) {
+  const keep = [];
+  for (const pts of polys) {
+    let lo = Infinity, hi = -Infinity, ylo = Infinity, yhi = -Infinity;
+    for (let i = 0; i < pts.length; i += 2) {
+      if (pts[i] < lo) lo = pts[i]; if (pts[i] > hi) hi = pts[i];
+      if (pts[i + 1] < ylo) ylo = pts[i + 1]; if (pts[i + 1] > yhi) yhi = pts[i + 1];
+    }
+    if (hi < minX || lo > maxX || yhi < minY || ylo > maxY) continue;
+    keep.push(pts);
+  }
+  const keptCircles = circles.filter((c) =>
+    c.cx + c.r >= minX && c.cx - c.r <= maxX && c.cy + c.r >= minY && c.cy - c.r <= maxY);
+
+  const w = maxX - minX, h = maxY - minY;
+  const width = WIDTH;
+  const height = Math.max(1, Math.round((h / w) * width));
+
+  // Binary payload rather than JSON: a million coordinates through
+  // JSON.stringify is both slow and enormous.
+  let bytes = 0;
+  for (const pts of keep) bytes += 4 + pts.byteLength;
+  const payload = Buffer.alloc(bytes);
   let o = 0;
-  for (const b of chunks) { Buffer.from(b).copy(payload, o); o += b.byteLength; }
-}
+  for (const pts of keep) {
+    payload.writeUInt32LE(pts.length / 2, o); o += 4;
+    Buffer.from(pts.buffer, pts.byteOffset, pts.byteLength).copy(payload, o);
+    o += pts.byteLength;
+  }
 
-const work = await mkdtemp(join(tmpdir(), 'b2d-dxfprev-'));
-const binFile = join(work, 'geom.bin');
-const htmlFile = join(work, 'render.html');
-await writeFile(binFile, payload);
-await writeFile(join(work, 'circles.json'), JSON.stringify(circles));
-
-await writeFile(htmlFile, `<!doctype html><meta charset="utf-8">
+  await writeFile(join(work, 'geom.bin'), payload);
+  await writeFile(join(work, 'circles.json'), JSON.stringify(keptCircles));
+  const htmlFile = join(work, 'render.html');
+  await writeFile(htmlFile, `<!doctype html><meta charset="utf-8">
 <style>html,body{margin:0;background:#fff}canvas{display:block}</style>
 <canvas id="c" width="${width}" height="${height}"></canvas>
 <script>
@@ -201,15 +237,12 @@ window.__done = false;
   ctx.strokeStyle = '#111';
   ctx.lineWidth = ${Math.max(0.6, width / 4000).toFixed(2)};
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-
   const minX = ${minX}, minY = ${minY}, w = ${w}, h = ${h};
   const sx = ${width} / w, sy = ${height} / h;
   const X = (x) => (x - minX) * sx;
   const Y = (y) => ${height} - (y - minY) * sy;   // DXF Y is up, canvas Y is down
-
-  let o = 0;
+  let o = 0, drawn = 0;
   ctx.beginPath();
-  let drawn = 0;
   while (o + 4 <= buf.byteLength) {
     const n = dv.getUint32(o, true); o += 4;
     if (!n || o + n * 8 > buf.byteLength) break;
@@ -222,7 +255,6 @@ window.__done = false;
     if (++drawn % 20000 === 0) { ctx.stroke(); ctx.beginPath(); }
   }
   ctx.stroke();
-
   ctx.beginPath();
   for (const c of circles) {
     ctx.moveTo(X(c.cx + c.r), Y(c.cy));
@@ -234,23 +266,50 @@ window.__done = false;
 })();
 </script>`);
 
-const puppeteer = (await import('puppeteer')).default;
-const { CHROME_FLAGS } = await import('./shot.mjs');
+  const page = await browser.newPage();
+  try {
+    page.on('pageerror', (e) => console.error('  page error:', e.message));
+    await page.setViewport({ width: Math.min(width, 2000), height: Math.min(height, 2000) });
+    await page.goto(pathToFileURL(htmlFile).href, { waitUntil: 'load' });
+    await page.waitForFunction('window.__done === true', { timeout: 600000 });
+    await mkdir(dirname(resolve(outPath)), { recursive: true });
+    await (await page.$('#c')).screenshot({ path: resolve(outPath) });
+    console.error(`  ${basename(outPath)}  ${width} x ${height}  (${keep.length} polylines)`);
+  } finally {
+    await page.close();
+  }
+}
+
+const work = await mkdtemp(join(tmpdir(), 'b2d-dxfprev-'));
 const browser = await puppeteer.launch({ headless: true, args: CHROME_FLAGS, protocolTimeout: 900000 });
 try {
-  const page = await browser.newPage();
-  page.on('pageerror', (e) => console.error('  page error:', e.message));
-  await page.setViewport({ width: Math.min(width, 2000), height: Math.min(height, 2000) });
-  await page.goto(pathToFileURL(htmlFile).href, { waitUntil: 'load' });
-  await page.waitForFunction('window.__done === true', { timeout: 600000 });
-  const drawn = await page.evaluate(() => window.__polys);
-  await mkdir(dirname(resolve(output)), { recursive: true });
-  const el = await page.$('#c');
-  await el.screenshot({ path: resolve(output) });
-  console.error(`  drew ${drawn} polyline(s)`);
+  const tilesArg = flag('tiles', null);
+  if (tilesArg) {
+    const tiles = findTiles(Number(flag('tile-gap', 20)));
+    console.error(`  ${tiles.length} tile(s) detected`);
+    const base = resolve(output).replace(/\.png$/i, '');
+    let n = 0;
+    for (const [x0, x1] of tiles) {
+      n++;
+      const pad = String(n).padStart(2, '0');
+      console.error(`  tile ${pad}: x ${x0.toFixed(0)} .. ${x1.toFixed(0)}`);
+      await renderRegion(browser, work, [x0, fullMinY, x1, fullMaxY], `${base}-${pad}.png`);
+    }
+  } else {
+    let box = [fullMinX, fullMinY, fullMaxX, fullMaxY];
+    const region = flag('region', null);
+    if (region) {
+      const r = String(region).split(',').map(Number);
+      if (r.length !== 4 || r.some((n) => !Number.isFinite(n))) {
+        console.error('--region takes x0,y0,x1,y1 in drawing units');
+        process.exit(1);
+      }
+      box = [Math.min(r[0], r[2]), Math.min(r[1], r[3]), Math.max(r[0], r[2]), Math.max(r[1], r[3])];
+      console.error(`  cropped to x ${box[0]} .. ${box[2]}   y ${box[1]} .. ${box[3]}`);
+    }
+    await renderRegion(browser, work, box, output);
+  }
 } finally {
   await browser.close();
   await rm(work, { recursive: true, force: true });
 }
-
-console.error(`\nwrote ${output}  (${width} x ${height})`);
