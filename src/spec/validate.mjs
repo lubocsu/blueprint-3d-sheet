@@ -207,14 +207,26 @@ function semanticCheck(spec) {
   for (const [i, p] of parts.entries()) {
     const inst = p.instances;
     if (!inst) continue;
+    const explicitAngles = Array.isArray(inst.angles) && inst.angles.length > 0;
     if (inst.pattern === 'grid') {
       if (!inst.counts?.length) errors.push(`/parts/${i} ("${p.id}") grid instances need "counts" (e.g. [3, 2])`);
       if (!inst.steps?.length) errors.push(`/parts/${i} ("${p.id}") grid instances need "steps"`);
-    } else if (!(inst.count > 0)) {
-      errors.push(`/parts/${i} ("${p.id}") ${inst.pattern} instances need a "count"`);
+    } else if (!explicitAngles && !(inst.count > 0)) {
+      errors.push(`/parts/${i} ("${p.id}") ${inst.pattern} instances need a "count" (or an "angles" list)`);
     }
-    if (inst.pattern === 'radial' && !(inst.radius >= 0)) {
-      warnings.push(`/parts/${i} ("${p.id}") radial instances with no "radius" all land on the axis`);
+    if (explicitAngles && inst.pattern !== 'radial' && inst.pattern !== 'helical') {
+      errors.push(`/parts/${i} ("${p.id}") "angles" only applies to radial or helical instances, not ${inst.pattern}`);
+    }
+    if (explicitAngles && inst.count > 0 && inst.count !== inst.angles.length) {
+      warnings.push(`/parts/${i} ("${p.id}") has ${inst.angles.length} angle(s) but count ${inst.count}; the angle list wins`);
+    }
+    if ((inst.pattern === 'radial' || inst.pattern === 'helical') && !(inst.radius >= 0)) {
+      warnings.push(`/parts/${i} ("${p.id}") ${inst.pattern} instances with no "radius" all land on the axis`);
+    }
+    // A helix that does not climb is a ring, and is almost certainly a mistake
+    // rather than intent — the pattern exists only for the rise.
+    if (inst.pattern === 'helical' && !inst.rise) {
+      warnings.push(`/parts/${i} ("${p.id}") helical instances with no "rise" are just a radial ring`);
     }
   }
 

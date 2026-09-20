@@ -42,21 +42,35 @@ function instanceMatrices(inst) {
     for (let i = 0; i < count; i++) {
       out.push(new THREE.Matrix4().makeTranslation(step[0] * i, step[1] * i, step[2] * i));
     }
-  } else if (pattern === 'radial') {
+  } else if (pattern === 'radial' || pattern === 'helical') {
     const axis = inst.axis ?? 'y';
     const radius = inst.radius ?? 0;
-    const arc = (inst.arc ?? 360) * DEG;
-    const full = Math.abs((inst.arc ?? 360) - 360) < 1e-6;
-    const div = full ? count : Math.max(count - 1, 1);
     const AX = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) }[axis];
-    for (let i = 0; i < count; i++) {
-      const a = (arc / div) * i;
+
+    // Real hardware is rarely evenly spaced: a nozzle orientation plan gives
+    // specific bearings, and an even division would quietly move every one of
+    // them. An explicit list places each repeat where the drawing puts it.
+    const explicit = Array.isArray(inst.angles) && inst.angles.length > 0;
+    // A helix must land its last instance ON the top, so it always divides by
+    // count-1. A full-circle ring must NOT, or the last repeat sits on the first.
+    const helical = pattern === 'helical';
+    const arcDeg = inst.arc ?? 360;
+    const full = !helical && Math.abs(arcDeg - 360) < 1e-6;
+    const n = explicit ? inst.angles.length : count;
+    const div = full ? n : Math.max(n - 1, 1);
+    const rise = helical ? (inst.rise ?? 0) : 0;
+
+    for (let i = 0; i < n; i++) {
+      const a = (explicit ? inst.angles[i] : (arcDeg / div) * i) * DEG;
       const rot = new THREE.Matrix4().makeRotationAxis(AX, a);
       // radial offset lies in the plane perpendicular to the axis
       const radial = axis === 'y' ? new THREE.Vector3(radius, 0, 0)
                    : axis === 'x' ? new THREE.Vector3(0, radius, 0)
                                   : new THREE.Vector3(radius, 0, 0);
       const p = radial.clone().applyMatrix4(rot);
+      // Climb along the axis of revolution. Explicit angles still rise evenly:
+      // the list says where each tread points, not how high it sits.
+      if (rise) p.addScaledVector(AX, (rise / div) * i);
       const m = new THREE.Matrix4().setPosition(p);
       // `orient` turns each instance to face outward from the axis
       if (inst.orient) m.multiply(rot);
@@ -343,3 +357,7 @@ export function buildAssembly(spec, materialFor) {
 
   return { root: shell, inner: root, records, pickables, bbox: worldBox, stats };
 }
+
+// Exported for `dev/instances-check.mjs`, which asserts the placement rules
+// directly rather than inferring them from a rendered page.
+export { instanceMatrices };

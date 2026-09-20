@@ -39,6 +39,9 @@ jobs:
       - name: Input classification and the binary guard
         run: node dev/source-check.mjs
 
+      - name: Instance placement patterns
+        run: node dev/instances-check.mjs
+
       - name: Bundle checks (local HTTP server, no external network)
         run: node dev/gather-check.mjs
 

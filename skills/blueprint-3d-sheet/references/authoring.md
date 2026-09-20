@@ -63,6 +63,30 @@ the wrong axis, this is why — and the fix is to change `step`, not the rotatio
 Linear takes the singular `count` and `step`. Mixing them is the most common
 validation failure.
 
+**A radial ring divides `arc` evenly from zero.** When the drawing gives real
+bearings — and a nozzle orientation plan always does — say so with `angles`
+instead, or every one of them is quietly moved:
+
+```json
+"instances": { "pattern": "radial", "axis": "y", "radius": 5704,
+               "angles": [30, 90, 150, 210, 270, 330] }
+```
+
+`angles` sets the count by its own length, and handles the irregular case
+(`[80, 152, 188, 224, 296]`) that no even division can express. Authoring one
+part per nozzle to work around it is exactly what the density gate discourages.
+
+**A ring cannot rise; `helical` can.** Spiral stair treads, screw flights and
+helical baffles need `rise`, the total climb along `axis` across the whole
+sweep. The last instance lands exactly on it:
+
+```json
+"instances": { "pattern": "helical", "axis": "y", "radius": 6250,
+               "count": 48, "arc": 900, "rise": 12260, "orient": true }
+```
+
+A `helical` with no `rise` is just a ring, and validate says so.
+
 **Every identifier in an expression must be a declared driver,** or the two
 built-ins `t` (seconds) and `fps`. There is no implicit vocabulary; a typo in a
 bind is a validation error, which is deliberate.

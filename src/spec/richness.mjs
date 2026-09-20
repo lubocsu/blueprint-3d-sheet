@@ -48,6 +48,9 @@ function effectivePartCount(parts) {
     let k = 1;
     if (inst) {
       if (inst.pattern === 'grid' && inst.counts) k = inst.counts.reduce((a, b) => a * b, 1);
+      // An explicit angle list IS the count — a spec that places six nozzles by
+      // bearing has six nozzles, whether or not it also wrote `count: 6`.
+      else if (Array.isArray(inst.angles) && inst.angles.length) k = inst.angles.length;
       else k = inst.count ?? 1;
       if (inst.mirror && inst.mirror !== 'none') k *= 2;
     }
