@@ -10,6 +10,12 @@ Several sessions are often open on this project at once. **Before starting any
 experimental change, enter a worktree.** Do not switch branches in the main
 checkout.
 
+The desktop app has a `worktree` toggle on the new-session screen ("Work in an
+isolated copy of the repository"). **Prefer it** — the session then starts in
+the worktree instead of switching into one partway through, so there is no
+window in which work sits in the shared checkout. Entering a worktree from
+inside a session is the fallback for when that was missed.
+
 Sessions sharing one directory share a HEAD and a working tree. A branch switch
 in one session moves all of them, and uncommitted work follows HEAD across the
 switch — so a commit can land on a branch it does not belong to. That has
