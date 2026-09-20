@@ -180,6 +180,14 @@ biggest difference between a sheet that impresses and one that doesn't.
 every part participates. Wiring explode onto the six parts you happened to think
 about leaves the skin sitting where it started, which is not an exploded view.
 
+**A translated sheet is issued to that language's standard.** If the subject,
+its material or its audience is Chinese, give the spec an `i18n` block so the
+page can be read in both: the renderer translates its own furniture and you
+translate the subject's words. Chinese here means GB — 主视图 rather than
+正视图, `B—B 剖视图` rather than a transliterated SECTION B-B, a 图样名称 /
+图样代号 / 阶段标记 title block. `b2d i18n spec.json --missing` lists exactly
+what still needs a line. See `references/authoring.md`.
+
 **Estimate honestly, and say when you did.** If a dimension came from the
 subject's known typical size rather than the drawing, the note should read that
 way. The sheet is allowed to be approximate; it is not allowed to pretend.

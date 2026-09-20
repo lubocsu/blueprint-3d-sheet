@@ -9,11 +9,21 @@
   --ink-soft:   #5e6b87;
   --label:      #8792a6;
   --accent:     #a82629;
+  /* The one colour on the sheet that is not drafting ink or the red used for
+     live values: the droplet in the mark. Pulled toward the paper's blue-grey
+     so it reads as part of the sheet rather than as pasted-in artwork. */
+  --brand:      #2b86bd;
   --active:     #253951;
   --rule:       #1b2745;
 
   --mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", "Cascadia Mono",
-          Menlo, Consolas, "Liberation Mono", monospace;
+          Menlo, Consolas, "Liberation Mono", monospace, var(--cjk);
+
+  /* Chinese falls through to here, glyph by glyph: Latin still comes out of the
+     mono face above and only the CJK characters come from this list. System
+     faces only — the sheet is offline and will never fetch a font. */
+  --cjk: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC",
+         "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
 
   --pad: clamp(14px, 1.6vw, 26px);
   --fs-micro: clamp(8px, 0.62vw, 10.5px);
@@ -75,10 +85,16 @@ html, body {
   left: calc(var(--pad) * 1.9); top: calc(var(--pad) * 1.5);
   display: flex; align-items: center; gap: 10px;
 }
-.brand .mark { width: 26px; height: 26px; flex: none; }
-.brand .org {
+.brand .mark { width: 28px; height: 28px; flex: none; }
+/*
+   Not uppercased and not widely tracked, in either language. The signature is
+   a name with Chinese and Latin in one line: uppercase would only shout at the
+   Latin half, and drafting-width tracking would pull the four characters apart
+   into four words.
+*/
+.brand .sig {
   font-size: var(--fs-body); font-weight: 700;
-  letter-spacing: .22em; text-transform: uppercase;
+  letter-spacing: .08em;
 }
 .brand .division {
   font-size: var(--fs-micro); letter-spacing: .13em;
@@ -197,6 +213,19 @@ html, body {
   right: calc(var(--pad) * 1.9);
   bottom: calc(var(--pad) * 1.7);
   width: clamp(330px, 30vw, 530px);
+}
+#titleblock .tb-org {
+  padding: 6px 12px 7px;
+  border-bottom: 1px solid #aeb9c9;
+}
+#titleblock .tb-org .k {
+  font-size: var(--fs-micro); letter-spacing: .18em;
+  color: var(--label); text-transform: uppercase;
+}
+#titleblock .tb-org .v {
+  font-size: var(--fs-small); font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  line-height: 1.4; margin-top: 2px;
 }
 #titleblock .tb-title { padding: 8px 12px 9px; }
 #titleblock .tb-title .k {
@@ -386,6 +415,41 @@ html, body {
 }
 
 #ann .partOutline { stroke: var(--accent); stroke-width: 1.6; fill: none; opacity: .9; }
+
+/* ------------------------------------------------------------------ chinese */
+
+/*
+   The drafting look leans on uppercase and wide tracking, and neither belongs
+   on Chinese: the glyphs are already square and full-width, uppercase only
+   shouts at the Latin fragments mixed in, and .24em of tracking on four
+   characters reads as four separate words. Same layout, different typography.
+*/
+html[lang^="zh"] .docTitle .t,
+html[lang^="zh"] .panel > h2,
+html[lang^="zh"] #key .meta,
+html[lang^="zh"] #instr .row .k,
+html[lang^="zh"] #titleblock .tb-org .k,
+html[lang^="zh"] #titleblock .tb-org .v,
+html[lang^="zh"] #titleblock .tb-title .k,
+html[lang^="zh"] #titleblock .tb-title .v,
+html[lang^="zh"] #titleblock .cell .k,
+html[lang^="zh"] .ctrlRow > .rowLabel,
+html[lang^="zh"] .btn,
+html[lang^="zh"] #hoverCard .n,
+html[lang^="zh"] #hoverCard .m {
+  text-transform: none;
+  letter-spacing: .08em;
+}
+/* The centred caption is the one place the air is the point. */
+html[lang^="zh"] #viewCaption .c { text-transform: none; letter-spacing: .22em; }
+html[lang^="zh"] #hint { text-transform: none; letter-spacing: .16em; }
+html[lang^="zh"] .brand .division,
+html[lang^="zh"] .docTitle .s,
+html[lang^="zh"] #viewCaption .s { letter-spacing: .04em; }
+html[lang^="zh"] #key .tx { line-height: 1.4; }
+
+/* A language button reads in its own language whatever the sheet is set to. */
+.btn.lang { text-transform: none; letter-spacing: .06em; min-width: 52px; }
 
 @media (max-width: 900px) {
   #key { width: min(60vw, 300px); }

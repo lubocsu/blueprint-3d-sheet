@@ -8,6 +8,7 @@
 
 import * as THREE from 'three';
 import { normalizeSpec } from '../spec/normalize.mjs';
+import { applyLocale, localeList } from '../spec/i18n.mjs';
 import { buildAssembly } from '../build/assembly.mjs';
 import { setLineResolution, lineMaterial, WEIGHTS } from '../build/edges.mjs';
 import { createStage } from './scene.mjs';
@@ -26,6 +27,34 @@ const raw = window.__B2D_SPEC__;
 if (!raw) throw new Error('no spec found on the page');
 
 const spec = normalizeSpec(raw);
+
+/* ------------------------------------------------------------------ language */
+
+const LOCALES = localeList(spec);
+const STORE_KEY = 'b2d.lang';
+
+/** file:// can refuse storage outright, and a sheet that throws there is worse than one that forgets. */
+const remembered = () => { try { return localStorage.getItem(STORE_KEY); } catch { return null; } };
+const remember = (code) => { try { localStorage.setItem(STORE_KEY, code); } catch { /* not fatal */ } };
+
+/**
+ * Which language the sheet opens in: an explicit `?lang=` wins, then whatever
+ * the reader last chose, then what the spec declares. No `navigator.language`
+ * sniffing — a drawing has to come up the same on the reviewer's machine as on
+ * the screenshot rig, and a locale nobody can read is worse than the default.
+ */
+let locale = (() => {
+  const known = new Set(LOCALES.map((l) => l.code));
+  const asked = new URLSearchParams(location.search).get('lang');
+  for (const c of [asked, remembered()]) if (c && known.has(c)) return c;
+  return spec.i18n?.default ?? spec.i18n?.base ?? LOCALES[0].code;
+})();
+
+// Before anything reads a string: the first paint is already in the right
+// language, so there is no flash of the authored one.
+applyLocale(spec, locale);
+document.documentElement.lang = locale;
+document.title = spec.meta.title;
 
 const sheet = document.getElementById('sheet');
 const canvas = document.getElementById('stage');
@@ -134,7 +163,28 @@ function applyView(v) {
   if (stage.grid) stage.grid.visible = !ortho;
 }
 
+/**
+ * Switch language in place.
+ *
+ * `applyLocale` rewrites the spec's strings, then the two things that hold
+ * text — the chrome and the dimension labels — re-read them. The scene, the
+ * camera, the running motions and the hover state are all untouched: the
+ * reader keeps the view they were studying and it changes language under them.
+ */
+function setLocale(code) {
+  if (code === locale) return;
+  locale = code;
+  applyLocale(spec, code);
+  document.documentElement.lang = code;
+  document.title = spec.meta.title;
+  chrome.setLocale(code);
+  dimensions.relabel();
+  annotations.bump();
+  remember(code);
+}
+
 const chrome = buildChrome(sheet, spec, {
+  locale,
   onView: (id) => applyView(viewCtl.setView(id)),
   onMotion: (id) => {
     const m = spec.motions.find((x) => x.id === id);
@@ -143,6 +193,7 @@ const chrome = buildChrome(sheet, spec, {
     chrome.setActiveMotions(drivers.activeIds());
     annotations.bump();
   },
+  onLocale: setLocale,
 });
 
 const annotations = createAnnotations(svg, spec, {
@@ -289,6 +340,10 @@ window.__B2D__ = {
     return drivers.isActive(id);
   },
   clearMotions: () => { drivers.reset(); chrome.setActiveMotions([]); annotations.bump(); },
+  /** Language, driven exactly as the console button drives it. */
+  locales: LOCALES.map((l) => l.code),
+  get locale() { return locale; },
+  setLocale: (code) => { setLocale(code); return locale; },
   /**
    * Test hooks for dev/explode-check.mjs. Reported per part in world space so
    * the checker can measure separation and reveal without knowing the node

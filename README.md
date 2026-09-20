@@ -81,8 +81,9 @@ this repository and *can* make requests when invoked deliberately.
 
 ```bash
 b2d validate <spec.json> [--strict]                  # schema + semantics + density gate
-b2d build <spec.json>    [--out dir] [--no-minify] [--embed-font f.woff2] [--force]
-b2d selftest <spec.json> [--out dir] [--shots dir]   # render every view/motion headless + sheet checks
+b2d build <spec.json>    [--out dir] [--no-minify] [--embed-font f.woff2] [--force] [--lang zh]
+b2d i18n <spec.json>     [--locale zh] [--missing]   # the translatable strings, ready to fill in
+b2d selftest <spec.json> [--out dir] [--shots dir]   # render every view/motion/language headless + sheet checks
 b2d serve                [--port 5178]               # static server for the dev harness
 ```
 
@@ -225,6 +226,70 @@ screen space, and it stays horizontal however steeply the line runs. Each
 dimension appears only in the views where it reads: length on side/plan, height
 on side/front, width on front/plan, derived automatically from the axis it
 measures.
+
+## Two languages, two standards
+
+A spec can carry its own translations. The page then grows a **LANG** row on
+the console and switches in place — the scene, the camera and any running
+motion carry on untouched while the words change.
+
+What switches is not only the words. English is ISO drafting practice; Chinese
+is GB, and GB does not name these things the same way:
+
+| | English (ISO) | 中文 (GB) |
+|---|---|---|
+| basic views | FRONT / SIDE / PLAN ELEVATION | 主视图 / 右视图 / 俯视图 — GB/T 17451 |
+| sections | SECTION B-B | B—B 剖视图 — GB/T 4458.1 |
+| title block | Drawing no. / Sheet / Status | 图样代号 / 张次 / 阶段标记 — GB/T 10609.1 |
+| projection | FIRST ANGLE | 第一角画法 — GB/T 14692 |
+| key to items | Key to items | 明细栏 — GB/T 10609.2 |
+| materials | machined metal / fluid | 金属材料 / 液体 — GB/T 4457.5 |
+
+Which view is which is geometry, not a guess: `az` is measured from +Z toward
++X, so `az=0` puts the camera on the object's right-hand side, and GB names
+that projection 右视图.
+
+The sheet's own furniture is translated by the renderer. The subject's words —
+part names, callout lines, captions, the title block's values — can only come
+from whoever wrote the spec, so they live in the spec:
+
+```json
+"i18n": {
+  "base": "en",
+  "locales": {
+    "zh": {
+      "label": "中文",
+      "strings": {
+        "meta.title": "主战坦克 · MK VI「末锻」",
+        "parts.gun.barrel.name": "120 mm 44 倍径滑膛炮",
+        "groups.running": "行动装置",
+        "callouts.7.text": "履带板，节距 196 mm",
+        "views.secBB.caption": "B—B 剖视图"
+      }
+    }
+  }
+}
+```
+
+Paths are keyed by id — `parts.<id>`, `callouts.<n>`, `views.<id>`,
+`motions.<id>`, `groups.<name>` — so inserting a part does not re-point every
+translation after it, and one `groups.<name>` entry retitles every part in that
+group. A path that resolves to nothing is a validation **error**, because the
+alternative is a translation that silently never appears. A string with no
+translation falls back to the authored one, so a half-finished translation is a
+legal state rather than a blank panel — `b2d validate` reports how far each
+language got.
+
+```bash
+b2d i18n examples/mbt-mk6/spec.json --missing   # what is still untranslated
+b2d build examples/mbt-mk6/spec.json --lang zh  # which language it opens in
+```
+
+The reader's own choice is remembered, and `?lang=zh` on the URL wins over it.
+What does not change with language is anything that is a fact about the drawing
+rather than a way of saying it: first angle stays first angle, and the
+dimensions, the tolerance and the units keep their values — GB and ISO both
+write millimetres as mm.
 
 ## Rendering
 

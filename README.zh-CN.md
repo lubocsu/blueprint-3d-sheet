@@ -77,8 +77,9 @@ PUPPETEER_SKIP_DOWNLOAD=1 npm install
 
 ```bash
 b2d validate <spec.json> [--strict]                  # schema + 语义 + 密度门
-b2d build <spec.json>    [--out dir] [--no-minify] [--embed-font f.woff2] [--force]
-b2d selftest <spec.json> [--out dir] [--shots dir]   # 无头渲染每个视图/运动 + 页面断言
+b2d build <spec.json>    [--out dir] [--no-minify] [--embed-font f.woff2] [--force] [--lang zh]
+b2d i18n <spec.json>     [--locale zh] [--missing]   # 列出可翻译的字符串，直接填
+b2d selftest <spec.json> [--out dir] [--shots dir]   # 无头渲染每个视图/运动/语言 + 页面断言
 b2d serve                [--port 5178]               # 开发用静态服务器
 ```
 
@@ -184,6 +185,61 @@ CLI 里还有 `ingest`、`research`、`bundle` 三条命令。它们尚未完成
 尺寸标注是青色的**世界空间几何体**，不是平面叠加层 —— 它们随透视倾斜，箭头会透视缩短。
 只有标签留在屏幕空间，且无论标注线多陡都保持水平。每个尺寸只出现在读得通的视图里：
 长度在侧视/俯视，高度在侧视/正视，宽度在正视/俯视，由它所测的轴自动推导。
+
+## 两种语言，两套标准
+
+spec 可以自带译文。页面于是在控制台多出一行 **语言**，并就地切换 —— 场景、相机和正在
+运行的动作全都不受影响，只有文字改变。
+
+切换的不只是词。英文按 ISO 制图惯例，中文按国标，而这些东西国标并不那样叫：
+
+| | English (ISO) | 中文（国标） |
+|---|---|---|
+| 基本视图 | FRONT / SIDE / PLAN ELEVATION | 主视图 / 右视图 / 俯视图 —— GB/T 17451 |
+| 剖视 | SECTION B-B | B—B 剖视图 —— GB/T 4458.1 |
+| 标题栏 | Drawing no. / Sheet / Status | 图样代号 / 张次 / 阶段标记 —— GB/T 10609.1 |
+| 画法 | FIRST ANGLE | 第一角画法 —— GB/T 14692 |
+| 零件索引 | Key to items | 明细栏 —— GB/T 10609.2 |
+| 材料 | machined metal / fluid | 金属材料 / 液体 —— GB/T 4457.5 |
+
+哪个视图是哪个由几何决定，不靠猜：`az` 自 +Z 向 +X 量取，所以 `az=0` 把相机放在物体的
+右侧，国标把这个投射方向称为 右视图。
+
+图纸自身的框架文字由渲染器翻译。主体自己的词 —— 零件名称、指引线条目、视图名、标题栏
+的内容 —— 只能来自写 spec 的人，因此放在 spec 里：
+
+```json
+"i18n": {
+  "base": "en",
+  "locales": {
+    "zh": {
+      "label": "中文",
+      "strings": {
+        "meta.title": "主战坦克 · MK VI「末锻」",
+        "parts.gun.barrel.name": "120 mm 44 倍径滑膛炮",
+        "groups.running": "行动装置",
+        "callouts.7.text": "履带板，节距 196 mm",
+        "views.secBB.caption": "B—B 剖视图"
+      }
+    }
+  }
+}
+```
+
+路径按 id 索引 —— `parts.<id>`、`callouts.<n>`、`views.<id>`、`motions.<id>`、
+`groups.<name>` —— 所以在前面插入一个零件不会让后面每一条译文错位；一条
+`groups.<name>` 就改掉该组所有零件的组名。指向不存在内容的路径是**错误**，因为另一种
+结果是译文悄悄不出现。没有译文的字符串回退到作者原文，所以译到一半是合法状态，而不是
+一块空白 —— `b2d validate` 会报告每种语言译到了哪里。
+
+```bash
+b2d i18n examples/mbt-mk6/spec.json --missing   # 还有哪些没译
+b2d build examples/mbt-mk6/spec.json --lang zh  # 页面以哪种语言打开
+```
+
+读者自己的选择会被记住，URL 上的 `?lang=zh` 优先于它。不随语言改变的，是那些属于图纸
+事实而非说法的东西：第一角画法仍是第一角画法，尺寸数字、公差和单位保持原值 —— 国标与
+ISO 都把毫米写作 mm。
 
 ## 渲染
 
