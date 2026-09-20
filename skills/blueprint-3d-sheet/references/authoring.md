@@ -12,6 +12,7 @@ is the contract, and `validate` checks against it directly.
 
 ## Contents
 
+- [Reading figures off a drawing](#reading-figures-off-a-drawing)
 - [Decomposing a subject](#decomposing-a-subject)
 - [Conventions that are easy to get backwards](#conventions-that-are-easy-to-get-backwards)
 - [Reaching density honestly](#reaching-density-honestly)
@@ -22,6 +23,35 @@ is the contract, and `validate` checks against it directly.
 - [Working order](#working-order)
 
 ---
+
+## Reading figures off a drawing
+
+**Render the region you are transcribing, on its own, at 4000 px or more.** Not
+the sheet it sits on — the table, the title block, the orientation plan, the
+dimension string. Then read it.
+
+This is the cheapest correction in the whole workflow and the one most often
+skipped. A nozzle schedule read off a whole-sheet render came back with six
+entries wrong: DN100 for what the drawing says is DN150, DN50 for DN65, 排气
+膨胀口 for 排气防爆口. Re-rendered at 4600 px across the table alone, every one
+of them was unambiguous. The cost was thirty seconds.
+
+```bash
+node dev/dxf-preview.mjs drawing.dxf zoom.png --region 633,428,726,582 --width 4600
+```
+
+`--region` takes drawing units; a full-extent pass prints the bbox to read them
+off. `--tiles auto` splits a set that is tiled across model space — a dozen A1
+sheets in a row render as an unreadable strip otherwise.
+
+The reason this matters more than it looks: **a figure you misread does not
+announce itself.** An absent number leaves a gap you can see and ask about. A
+number transcribed wrong becomes something the sheet asserts in 20 mm type, and
+it will be believed. Every downstream check — the density gate, grounding,
+`selftest` — passes a confidently wrong figure exactly as it passes a right one.
+
+The same applies to anything the drawing states rather than draws: parts lists,
+material tables, weight columns, azimuth plans, welding callouts.
 
 ## Decomposing a subject
 
@@ -43,6 +73,29 @@ A decomposition that reads as engineering usually has these layers:
 The subject class guidance from `spec-guide.mjs` tells you what each layer
 usually contains for this kind of object. Follow it — it is the difference
 between "eight boxes" and a drawing.
+
+**Parent a sub-assembly. Do not scatter it.** When several parts make up one
+thing — a platform and its beams, posts, handrail and toe plate; a ladder and
+its rungs and cage; a stair and its treads and stringer — give them a `parent`
+rather than authoring them all at the top level and positioning each by hand.
+
+This is not tidiness. It makes a whole class of error *unrepresentable*. A
+platform deck authored on bearing 250° with its beams, stanchions and handrail
+left at bearing 0° renders as a deck with no supports and no railing: the
+members exist, they are simply nowhere near the platform. Nothing complains,
+because each part is individually valid. Parented to the deck, they inherit its
+frame and cannot be anywhere else. The same mistake put a cage's vertical straps
+six times further out than the hoops they tie together.
+
+Rule of thumb: if the thing would move when its host moves, or if you would
+call it *part of* the host rather than a neighbour of it, parent it.
+
+One honest cost: a part with children cannot have its static instances merged
+into one draw call, because merging bakes away the per-instance frames the
+children need. On a large assembly that is a real number of extra draws. It is
+almost always the right trade — a sub-assembly that cannot come apart wrongly is
+worth more than the draw calls — but it is why the builder does not simply
+parent everything for you.
 
 ## Conventions that are easy to get backwards
 
@@ -250,7 +303,12 @@ either language.
 
 ## Working order
 
-Build the spec in this order; each step makes the next one checkable.
+Before any of this, render the regions you are going to transcribe from — see
+*Reading figures off a drawing*. Every number below has to come from somewhere,
+and re-reading a table once the spec is built costs far more than reading it
+right the first time.
+
+Then build the spec in this order; each step makes the next one checkable.
 
 1. `meta` and `bounds` — get the envelope right first, everything scales from it
 2. Primary structure and enclosure, with real transforms
