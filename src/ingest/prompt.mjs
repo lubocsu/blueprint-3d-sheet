@@ -36,6 +36,23 @@ panelLine{face,count,along}           weldSeam{face,path:[[x,y,z]..],r}
 "face" is one of top|bottom|front|back|left|right of the part's bounding box.
 u/v are coordinates on that face, origin at its centre.`;
 
+const INSTANCES = `
+linear{count,step:[x,y,z]}            a run: shell courses, rungs, bays
+radial{count,axis,radius,arc?,orient?} a ring: bolts, columns, roof panels
+helical{count,axis,radius,rise,arc?}  a ring that CLIMBS: spiral stair treads,
+                                      screw flights, helical baffles. The last
+                                      instance lands exactly on "rise".
+grid{counts:[nx,ny],steps:[[..],[..]]}  a field: beams, piles, panels
+mirror:"x"|"y"|"z" doubles any of them across that axis.
+
+"angles":[30,90,150,...] replaces the even division on radial/helical and puts
+each repeat on its own bearing in degrees. Use it whenever the drawing gives
+real positions — a nozzle orientation plan almost always does, and they are
+rarely evenly spaced. It sets the count by its own length.
+
+Instance offsets are applied in the PARENT's frame, ABOVE the part's own
+rotation, so a repeat is unaffected by how the part is turned.`;
+
 const CHANNELS = `
 spin{axis:"x"|"y"|"z",bind}          bind is a RATE in degrees/second
 oscillate{target,amp,freq,phase?,spread?,bind}   value = amp*sin(2pi*freq*t+phase)*bind
@@ -110,6 +127,9 @@ ${SHAPES}
 
 DETAIL DECORATORS (procedural greebles — one line buys hundreds of features)
 ${DETAILS}
+
+INSTANCE PATTERNS (one part, many repeats — this is how density is earned)
+${INSTANCES}
 
 ANIMATION CHANNELS
 ${CHANNELS}

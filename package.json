@@ -10,7 +10,7 @@
     "validate": "node bin/b2d.mjs validate",
     "build": "node bin/b2d.mjs build",
     "dev": "node bin/b2d.mjs dev",
-    "check": "node dev/gather-check.mjs && node dev/evidence-check.mjs && node dev/research-check.mjs",
+    "check": "node dev/source-check.mjs && node dev/instances-check.mjs && node dev/gather-check.mjs && node dev/evidence-check.mjs && node dev/research-check.mjs",
     "selftest": "node bin/b2d.mjs selftest"
   },
   "dependencies": {

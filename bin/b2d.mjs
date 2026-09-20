@@ -16,7 +16,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { basename, join, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validateSpec } from '../src/spec/validate.mjs';
 import { checkRichness } from '../src/spec/richness.mjs';
 import { normalizeSpec } from '../src/spec/normalize.mjs';
@@ -159,7 +159,11 @@ async function cmdSelftest() {
   page.on('console', (m) => { if (m.type() === 'error') problems.push(m.text()); });
 
   await page.setViewport({ width: 1600, height: 950, deviceScaleFactor: 2 });
-  await page.goto(`file://${file.replace(/\\/g, '/')}`, { waitUntil: 'load', timeout: 60000 });
+  // `pathToFileURL` rather than string concatenation: `--out` may be relative,
+  // and a relative path behind `file://` resolves to a host name, not a file.
+  // It also escapes a path with spaces or non-ASCII in it, which hand-built
+  // URLs silently get wrong.
+  await page.goto(pathToFileURL(resolve(file)).href, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction('window.__B2D__ && window.__B2D__.ready', { timeout: 30000 });
 
   const stats = await page.evaluate(() => ({ ...window.__B2D__.stats, buildMs: window.__B2D__.buildMs }));
@@ -213,7 +217,10 @@ async function cmdSelftest() {
         instrVisible: vis('#instr'),
         dims: [...document.querySelectorAll('.dimlabel')].filter((t) => t.style.display !== 'none').length,
         balloons: balloons.length,
-        minGap: balloons.length > 1 ? minGap : Infinity,
+        // null, not Infinity: page.evaluate serialises through JSON, where
+        // Infinity becomes null anyway — and `null < 24` is TRUE, so the
+        // caller would report a bogus failure and then crash formatting it.
+        minGap: balloons.length > 1 ? minGap : null,
         onPanel,
       };
     });
@@ -229,7 +236,7 @@ async function cmdSelftest() {
     if (probe.onPanel > 0) {
       failures.push(`${where}: ${probe.onPanel} balloon(s) sitting on a panel`);
     }
-    if (probe.minGap < 24) {
+    if (probe.minGap != null && probe.minGap < 24) {
       failures.push(`${where}: two balloons only ${probe.minGap.toFixed(0)}px apart (need >= 24)`);
     }
   }

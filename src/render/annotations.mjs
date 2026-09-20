@@ -443,6 +443,19 @@ export function createAnnotations(svg, spec, ctx) {
   let needsSolve = true;
   let opacity = 0;
 
+  /**
+   * `view.callouts: false` asks for a bare plate with no balloons — the
+   * reference's PLAN view. It must NOT take the dimensions with it.
+   *
+   * The fade below drives the whole SVG, and the dimension labels live in that
+   * same SVG, so folding suppression into it hid the dimensions too. An
+   * orthographic plate is then guaranteed to fail `selftest`, which requires one
+   * — the schema documented an option the quality gate forbade. Suppression now
+   * hides the balloon elements themselves and leaves the fade to mean what it
+   * says: how settled the picture is.
+   */
+  let balloonsSuppressed = false;
+
   const _camPos = new THREE.Vector3();
   const _wp = new THREE.Vector3();
   const _wn = new THREE.Vector3();
@@ -586,7 +599,7 @@ export function createAnnotations(svg, spec, ctx) {
     const shoulder = Math.min(Math.max(w * SHOULDER_FRAC, SHOULDER_MIN), SHOULDER_MAX);
 
     for (const c of callouts) {
-      const show = c.inLayout && c.pos;
+      const show = c.inLayout && c.pos && !balloonsSuppressed;
       for (const el of [c.leader, c.dot, c.circle, c.label]) {
         el.style.display = show ? '' : 'none';
       }
@@ -645,7 +658,7 @@ export function createAnnotations(svg, spec, ctx) {
       frame++;
 
       const view = ctx.viewCtl?.current ?? null;
-      const suppressed = view?.callouts === false;
+      balloonsSuppressed = view?.callouts === false;
 
       // A view tween counts as activity for as long as it runs.
       if (ctx.viewCtl?.tweening) lastActivity = performance.now();
@@ -653,7 +666,7 @@ export function createAnnotations(svg, spec, ctx) {
       const quiet = performance.now() - lastActivity > SETTLE_MS;
       if (quiet && needsSolve) { solve(w, h); needsSolve = false; }
 
-      const want = (quiet && !suppressed) ? 1 : 0;
+      const want = quiet ? 1 : 0;
       opacity += (want - opacity) * (1 - Math.exp(-FADE_RATE * Math.min(dt, 0.1)));
       if (opacity < 0.002) opacity = 0;
       svg.style.opacity = opacity.toFixed(3);
