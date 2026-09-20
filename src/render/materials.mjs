@@ -41,21 +41,11 @@ export const MATERIAL_INDEX = {
   earth: 11,
 };
 
-/** Human labels, shown in the hover card. */
-export const MATERIAL_LABEL = {
-  metal: 'machined metal',
-  casting: 'casting',
-  plastic: 'moulded plastic',
-  glass: 'glazing',
-  rubber: 'elastomer',
-  wood: 'timber',
-  concrete: 'concrete',
-  masonry: 'masonry',
-  liquid: 'fluid',
-  insulation: 'insulation',
-  fabric: 'fabric',
-  earth: 'earth / fill',
-};
+/**
+ * The human labels shown in the hover card live in `spec/i18n.mjs` under
+ * `material.<key>`, with the rest of the sheet's own wording — they have to be
+ * translated, and a second copy here would be the one that goes stale.
+ */
 
 /**
  * Per-material tone bias. Rubber and earth read dark on a drawing, glass reads

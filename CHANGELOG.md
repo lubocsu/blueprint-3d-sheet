@@ -6,6 +6,19 @@ First public packaging. The pipeline itself has been in use privately; this
 release is about making it installable by other people.
 
 ### Added
+- **Two languages on one sheet.** A spec can carry an `i18n` block of
+  translations and the page grows a language row on the console that switches in
+  place — the scene, the camera and any running motion carry on untouched. The
+  Chinese column is GB rather than a word-for-word translation: 主视图 / 右视图 /
+  俯视图 per GB/T 17451, `B—B 剖视图` per GB/T 4458.1, a 图样名称 / 图样代号 /
+  阶段标记 title block per GB/T 10609.1, 第一角画法 per GB/T 14692, 明细栏 per
+  GB/T 10609.2 and section-hatching material names per GB/T 4457.5. English
+  stays ISO practice. Both shipped examples are translated in full.
+- `b2d i18n <spec> [--locale zh] [--missing]`, which prints the translatable
+  strings as a ready-to-fill map, and `b2d build --lang zh`, which picks the
+  language the page opens in. `b2d validate` reports how far each language got,
+  `b2d selftest` shoots and asserts every language, and `dev/i18n-check.mjs`
+  holds the round trip, the path scheme and the GB vocabulary in place.
 - Claude Code plugin manifests (`.claude-plugin/`), so the repository is both a
   plugin and its own marketplace.
 - `skills/blueprint-3d-sheet/` — the authoring skill, with every path anchored to

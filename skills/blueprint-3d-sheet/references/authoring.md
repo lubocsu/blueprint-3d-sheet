@@ -18,6 +18,7 @@ is the contract, and `validate` checks against it directly.
 - [Interior parts, section and explode](#interior-parts-section-and-explode)
 - [Motion](#motion)
 - [Views, dimensions, callouts](#views-dimensions-callouts)
+- [Two languages](#two-languages)
 - [Working order](#working-order)
 
 ---
@@ -210,6 +211,43 @@ to declare.
 `instruments` are live readouts — label plus an expression over the drivers,
 with a printf-style format. Six rows is the reference density.
 
+## Two languages
+
+A sheet can be issued in more than one language. The renderer translates its own
+furniture — panel headings, the title block's field names, the view captions it
+invents. The subject's words are yours, and they go in an `i18n` block:
+
+```json
+"i18n": {
+  "base": "en",
+  "locales": {
+    "zh": { "label": "中文", "strings": { "parts.gun.barrel.name": "120 mm 44 倍径滑膛炮" } }
+  }
+}
+```
+
+Run `b2d i18n spec.json --missing` and work from what it prints rather than
+inventing paths. Keys are ids, never positions: `parts.<id>.name|note`,
+`groups.<name>` (one entry retitles the whole group), `callouts.<n>.text`,
+`views.<id>.label|caption|sub`, `motions.<id>.label`, `instruments.<i>.label`,
+`meta.*`. A path that resolves to nothing fails validation, because the
+alternative is a line that silently never reaches the sheet.
+
+**Translate the drawing, not the words.** Chinese here means GB, and GB names
+things its own way: the front view is 主视图 and not 正视图, a cut view is a
+剖视图 labelled `B—B` with an em dash, the title block reads 图样名称 /
+图样代号 / 阶段标记, the projection is 第一角画法, and materials take their
+names from the 剖面符号 table (金属材料, 非金属材料, 液体). The renderer
+already does this for its own furniture — match it in your captions instead of
+transliterating the English.
+
+Leave alone anything that is a fact rather than a way of saying it: dimension
+figures, the tolerance, the units, drawing numbers, revision letters, dates and
+personal names are the same on both sheets.
+
+Console labels stay short — about eight characters is what a button fits, in
+either language.
+
 ## Working order
 
 Build the spec in this order; each step makes the next one checkable.
@@ -221,4 +259,5 @@ Build the spec in this order; each step makes the next one checkable.
 5. Interior parts, hidden, with the visibility channel
 6. Drivers, motions, channels; then `instruments`
 7. Views including the section, `explode`, dimensions, callouts
-8. `validate --strict`, then `build`, then `selftest` — and look at the shots
+8. Translations, if the sheet is to be issued in more than one language
+9. `validate --strict`, then `build`, then `selftest` — and look at the shots

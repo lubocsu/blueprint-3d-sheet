@@ -179,6 +179,15 @@ export function createDimensions({ parent, svg, spec, camera, viewCtl }) {
     /** Datum centrelines only appear on the orthographic plates. */
     setDatumsVisible(on) { datumGroup.visible = !!on; },
 
+    /**
+     * Re-read the dimension text. A language switch rewrites `d.label` in
+     * place, and the SVG node was built once — geometry and placement are
+     * untouched, only the words change.
+     */
+    relabel() {
+      for (const e of entries) e.text.textContent = e.spec.label;
+    },
+
     setResolution(w, h) {
       for (const e of entries) e.line.material.resolution.set(w, h);
       datumLine.material.resolution.set(w, h);

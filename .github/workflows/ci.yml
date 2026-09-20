@@ -51,6 +51,11 @@ jobs:
       - name: Research checks
         run: node dev/research-check.mjs
 
+      # Both languages, and the Chinese one against GB rather than against a
+      # dictionary: a sheet that switches to Chinese is issued to GB/T.
+      - name: Language and drafting-standard checks
+        run: node dev/i18n-check.mjs
+
       - name: Validate both examples under --strict
         run: |
           node bin/b2d.mjs validate examples/mbt-mk6/spec.json --strict

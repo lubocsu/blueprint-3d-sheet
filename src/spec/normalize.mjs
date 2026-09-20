@@ -345,7 +345,10 @@ export function normalizeSpec(input) {
   }
 
   // ---- views ----------------------------------------------------------------
-  if (!spec.views?.length) spec.views = clone(DEFAULT_VIEWS);
+  // Tagged, so the i18n layer can tell a view the renderer invented from one
+  // the author wrote: the invented ones translate from the built-in dictionary,
+  // which is what lets a spec with no views of its own still read in Chinese.
+  if (!spec.views?.length) spec.views = clone(DEFAULT_VIEWS).map((v) => ({ ...v, _builtin: true }));
   for (const v of spec.views) {
     v.projection ??= 'perspective';
     v.az ??= 38;

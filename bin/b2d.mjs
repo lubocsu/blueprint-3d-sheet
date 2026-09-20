@@ -8,7 +8,8 @@
  *   b2d bundle fetch|score|select|status <bundle>
  *   b2d bundle prune [--older-than-days n] [--dry-run]
  *   b2d validate <spec>  [--strict]
- *   b2d build <spec>     [--out dir] [--no-minify] [--embed-font f.woff2]
+ *   b2d build <spec>     [--out dir] [--no-minify] [--embed-font f.woff2] [--lang zh]
+ *   b2d i18n <spec>      [--locale zh] [--missing] [--out strings.json]
  *   b2d selftest <spec>  [--out dir] [--shots dir]
  *   b2d serve            [--port 5178]
  */
@@ -20,6 +21,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validateSpec } from '../src/spec/validate.mjs';
 import { checkRichness } from '../src/spec/richness.mjs';
 import { normalizeSpec } from '../src/spec/normalize.mjs';
+import { localeCoverage, localizableSlots, localeList } from '../src/spec/i18n.mjs';
 import { writePage } from '../src/emit/page.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -75,6 +77,17 @@ function report(spec, { strict }) {
     `${s.motions} motions · ${s.instruments} readouts · ${s.details} details · ` +
     `notes ${Math.round(s.noteRatio * 100)}%`));
 
+  // A half-translated sheet still renders, and quietly falls back to the
+  // authored language partway down the legend. Say how far each one got.
+  if (spec.i18n) {
+    try {
+      for (const c of localeCoverage(normalizeSpec(spec))) {
+        console.error(C.dim(`  ${c.code}: ${c.covered}/${c.total} strings translated` +
+                            `${c.covered < c.total ? ` (${c.total - c.covered} fall back to ${spec.i18n.base ?? 'en'})` : ''}`));
+      }
+    } catch { /* structural problems are already reported above */ }
+  }
+
   for (const w of rich.warnings) console.error(C.yel('  thin  ') + w);
   if (!rich.ok) {
     console.error(C.red(`\n✗ density gate: ${rich.errors.length} shortfall(s):`));
@@ -108,6 +121,15 @@ async function cmdBuild() {
     console.error(C.yel('\n  --force: building despite the above'));
   }
 
+  // `--lang` picks which language the page OPENS in; every declared language
+  // still ships in the page and the reader can switch at any time.
+  const lang = flag('lang', null);
+  if (typeof lang === 'string') {
+    const known = localeList(spec).map((l) => l.code);
+    if (!known.includes(lang)) die(`spec has no "${lang}" locale (has ${known.join(', ')})`);
+    if (spec.i18n) spec.i18n = { ...spec.i18n, default: lang };
+  }
+
   const id = normalizeSpec(spec).meta.id;
   const outDir = String(flag('out', join(ROOT, 'out', id)));
   const embedFont = flag('embed-font', null);
@@ -117,6 +139,40 @@ async function cmdBuild() {
   });
   console.error(C.grn(`\n✓ ${file}  ${(bytes / 1024).toFixed(0)} kB, self-contained`));
   console.log(file);
+}
+
+/**
+ * Print the translatable strings as a ready-to-fill `strings` map.
+ *
+ * Translating a sheet by hand means first knowing what there is to translate,
+ * and the paths are derived from the spec rather than guessable. `--missing`
+ * narrows it to what a locale has not covered yet, which is the form you want
+ * on the second pass.
+ */
+async function cmdI18n() {
+  const path = positional[0];
+  const spec = await readSpec(path);
+  const code = String(flag('locale', 'zh'));
+  const existing = spec.i18n?.locales?.[code]?.strings ?? {};
+  const slots = localizableSlots(normalizeSpec(spec));
+
+  const out = {};
+  for (const s of slots) {
+    if (has('missing') && existing[s.path] != null) continue;
+    out[s.path] = existing[s.path] ?? s.get();
+  }
+
+  const body = JSON.stringify(out, null, 2);
+  const dest = flag('out', null);
+  if (typeof dest === 'string') {
+    await writeFile(dest, `${body}\n`, 'utf8');
+    console.error(C.grn(`✓ ${dest}`));
+  } else {
+    console.log(body);
+  }
+  const covered = slots.filter((s) => existing[s.path] != null).length;
+  console.error(C.dim(`  ${Object.keys(out).length} string(s) listed · ` +
+                      `${code} currently covers ${covered}/${slots.length}`));
 }
 
 /** Resolve once the page has rendered `n` frames, bounded for throttled headless Chrome. */
@@ -252,6 +308,65 @@ async function cmdSelftest() {
     const out = join(shotDir, `motion-${m.id}.png`);
     await page.screenshot({ path: out });
     shots.push(out);
+  }
+
+  // Every language the sheet offers. A translation that throws, empties a
+  // panel or never actually lands only shows up when the page is switched, and
+  // the shots make a wrong line visible to a reader of that language.
+  const locales = await page.evaluate(() => window.__B2D__.locales ?? []);
+  if (locales.length > 1) {
+    const seen = [];
+    for (const code of locales) {
+      const probe = await page.evaluate((c) => {
+        window.__B2D__.clearMotions();
+        window.__B2D__.setView(window.__B2D__.spec.views[0].id);
+        // The motion loop left the drivers wherever it stopped, and an explode
+        // that has not relaxed yet holds the camera framing wide. Run the
+        // simulation home first so the language shot is of the sheet at rest.
+        window.__B2D__.advance(4);
+        window.__B2D__.setLocale(c);
+        const text = (sel) => document.querySelector(sel)?.textContent?.trim() ?? '';
+        return {
+          lang: document.documentElement.lang,
+          title: document.title,
+          heading: text('#key h2') || text('#instr h2'),
+          hasKey: Boolean(document.querySelector('#key .item')),
+          hasConsole: Boolean(document.querySelector('#console .btn')),
+          firstItem: text('#key .item .tx'),
+          firstView: text('#console .ctrlRow .btn'),
+        };
+      }, code);
+      // The same 90 frames the view loop waits for: the balloon layout glides
+      // into place, and a shot taken mid-glide would show a layout the reader
+      // never sees.
+      await settle(page, 90);
+      const out = join(shotDir, `lang-${code}.png`);
+      await page.screenshot({ path: out });
+      shots.push(out);
+
+      const where = `locale "${code}"`;
+      if (probe.lang !== code) failures.push(`${where}: <html lang> stayed at "${probe.lang}"`);
+      if (!probe.title) failures.push(`${where}: the page title came out empty`);
+      // Only assert on panels this sheet actually has — a spec with no
+      // callouts has no legend to translate.
+      if (probe.hasKey && !probe.firstItem) failures.push(`${where}: the legend lost its text`);
+      if (probe.hasConsole && !probe.firstView) failures.push(`${where}: a console button lost its label`);
+      seen.push(probe);
+    }
+    // A toggle that changes nothing is the failure worth catching: the sheet
+    // furniture is translated by the renderer, so it must differ every time.
+    const headings = seen.map((p) => p.heading).filter(Boolean);
+    if (headings.length === locales.length && new Set(headings).size !== locales.length) {
+      failures.push(`the language toggle left the panel headings identical across ${locales.join(', ')}`);
+    }
+    // Back to where we started, exactly.
+    const home = await page.evaluate((c) => {
+      window.__B2D__.setLocale(c);
+      return { heading: document.querySelector('#key h2')?.textContent?.trim() ?? '', title: document.title };
+    }, locales[0]);
+    if (home.heading !== seen[0].heading || home.title !== seen[0].title) {
+      failures.push(`switching back to "${locales[0]}" did not restore the sheet`);
+    }
   }
 
   // no external requests is a hard requirement of the emitted page
@@ -481,6 +596,7 @@ async function cmdServe() {
 const COMMANDS = {
   validate: cmdValidate,
   build: cmdBuild,
+  i18n: cmdI18n,
   selftest: cmdSelftest,
   ingest: cmdIngest,
   research: cmdResearch,
@@ -503,6 +619,9 @@ if (!cmd || !COMMANDS[cmd] || wantsHelp) {
   b2d bundle prune             [--older-than-days 30] [--dry-run]
   b2d validate <spec.json>     [--strict]
   b2d build <spec.json>        [--out dir] [--no-minify] [--embed-font f.woff2] [--force]
+                               [--lang zh]   which language the page opens in
+  b2d i18n <spec.json>         [--locale zh] [--missing] [--out strings.json]
+                               list the translatable strings, ready to fill in
   b2d selftest <spec.json>     [--out dir] [--shots dir]
   b2d serve                    [--port 5178]
 `);

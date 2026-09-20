@@ -59,12 +59,22 @@ export async function renderPage(spec, { minify = true, embedFont = null } = {})
   if (embedFont) {
     const buf = await readFile(embedFont);
     const b64 = buf.toString('base64');
+    // `var(--cjk)` stays on the end: an embedded Latin face has no Chinese in
+    // it, and without the fallback chain a translated sheet would render in
+    // whatever the browser picks last.
     fontTag = `<style>@font-face{font-family:"B2D Mono";src:url(data:font/woff2;base64,${b64}) format("woff2");font-display:block}` +
-              `:root{--mono:"B2D Mono",ui-monospace,monospace}</style>`;
+              `:root{--mono:"B2D Mono",ui-monospace,monospace,var(--cjk)}</style>`;
   }
 
+  // The language the page opens in, on <html> from the first byte so the CJK
+  // typography rules apply before any script runs.
+  const lang = String(spec.i18n?.default ?? spec.i18n?.base ?? 'en').replace(/[^A-Za-z0-9-]/g, '') || 'en';
+
   const html = template
-    .replace('{{TITLE}}', String(spec.meta?.title ?? 'Assembly').replace(/[<>&]/g, ''))
+    .replace('{{LANG}}', lang)
+    .replace('{{TITLE}}', String(
+      spec.i18n?.locales?.[lang]?.strings?.['meta.title'] ?? spec.meta?.title ?? 'Assembly',
+    ).replace(/[<>&]/g, ''))
     .replace('{{STYLES}}', () => styles)
     .replace('{{FONT}}', () => fontTag)
     .replace('{{SPEC}}', () => safeJson(spec))

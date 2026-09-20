@@ -15,6 +15,8 @@ import addFormats from 'ajv-formats';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { compileExpr, ExprError } from './expr.mjs';
+import { normalizeSpec } from './normalize.mjs';
+import { localizableSlots, CHROME, BASE_LOCALE } from './i18n.mjs';
 
 const schema = JSON.parse(
   readFileSync(fileURLToPath(new URL('./schema.json', import.meta.url)), 'utf8'),
@@ -227,6 +229,52 @@ function semanticCheck(spec) {
     // rather than intent — the pattern exists only for the rise.
     if (inst.pattern === 'helical' && !inst.rise) {
       warnings.push(`/parts/${i} ("${p.id}") helical instances with no "rise" are just a radial ring`);
+    }
+  }
+
+  // translations — a path that resolves to nothing is a translation that will
+  // never appear on the sheet, and the page gives no hint that it was dropped
+  if (spec.i18n) {
+    const base = spec.i18n.base ?? BASE_LOCALE;
+    const locales = spec.i18n.locales ?? {};
+    const dflt = spec.i18n.default ?? base;
+    if (dflt !== base && !(dflt in locales)) {
+      errors.push(`/i18n default locale "${dflt}" is neither the base language nor declared in /i18n/locales`);
+    }
+    // Paths are checked against the NORMALIZED spec: a spec that declares no
+    // views still gets the six default ones, and they are translatable.
+    let resolved = spec;
+    try { resolved = normalizeSpec(spec); } catch { /* keep the authored spec */ }
+    const paths = new Set(localizableSlots(resolved).map((s) => s.path));
+
+    for (const [code, def] of Object.entries(locales)) {
+      const where = `/i18n/locales/${code}`;
+      const strings = def?.strings ?? {};
+      const keys = Object.keys(strings);
+      if (!keys.length) {
+        warnings.push(`${where} declares a language but translates nothing; only the sheet furniture will change`);
+      }
+      for (const [k, v] of Object.entries(strings)) {
+        if (typeof v !== 'string' || !v.trim()) {
+          errors.push(`${where} "${k}" is empty; drop the key instead — an untranslated string falls back to ${base}`);
+          continue;
+        }
+        if (k.startsWith('chrome.')) {
+          if (!(k.slice(7) in CHROME[BASE_LOCALE])) {
+            errors.push(`${where} "${k}" is not one of the renderer's own strings`);
+          }
+          continue;
+        }
+        if (!paths.has(k)) {
+          errors.push(`${where} "${k}" does not name any text in this spec`);
+          continue;
+        }
+        // The console buttons are a fixed-width row; the schema caps the
+        // authored label at 8 and a translation has to live in the same space.
+        if (/^(views|motions)\.[^.]+\.label$/.test(k) && [...v].length > 8) {
+          warnings.push(`${where} "${k}" is ${[...v].length} characters; console buttons fit about 8`);
+        }
+      }
     }
   }
 

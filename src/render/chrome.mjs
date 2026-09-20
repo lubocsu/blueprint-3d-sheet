@@ -5,10 +5,15 @@
  * `FIRE` or `TURRET AZIMUTH` anywhere in this file — the console rows come from
  * `spec.views` / `spec.motions`, and the instrument rows from
  * `spec.instruments`. Swapping subject is a data change.
+ *
+ * Language works the same way. Nothing here holds a literal string: the sheet's
+ * own furniture comes from the i18n dictionary and everything else from the
+ * spec, and both are read through `dyn()` so a language switch re-reads them
+ * rather than rebuilding the sheet.
  */
 
 import { compileExpr } from '../spec/expr.mjs';
-import { MATERIAL_LABEL } from './materials.mjs';
+import { chromeText, localeList } from '../spec/i18n.mjs';
 
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -47,15 +52,46 @@ function formatValue(fmt, v) {
   });
 }
 
+/**
+ * The publisher's mark: a droplet inside a shield.
+ *
+ * Drawn in the sheet's own idiom rather than pasted in as artwork — one stroke
+ * weight, `currentColor` for the shield so it is the same ink as the frame
+ * around it, and a single brand blue for the drop. That is the whole tuning:
+ * the identity is the shield and the droplet, and everything else about it is
+ * the drafting sheet's, so it sits on the paper instead of on top of it.
+ */
 const LOGO = `
 <svg class="mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="1" y="1" width="30" height="30" stroke="currentColor" stroke-width="1.4"/>
-  <path d="M16 6 L26 16 L16 26 L6 16 Z" stroke="currentColor" stroke-width="1.4"/>
-  <path d="M16 11 L21 16 L16 21 L11 16 Z" fill="currentColor" opacity=".85"/>
+  <path d="M5.7 4.9 H26.3 V15.6 C26.3 22.4 21.9 27.5 16 29.8 C10.1 27.5 5.7 22.4 5.7 15.6 Z"
+        stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+  <path d="M16 8.2 C16 8.2 10.8 14.4 10.8 18.1 A5.2 5.2 0 0 0 21.2 18.1 C21.2 14.4 16 8.2 16 8.2 Z"
+        fill="var(--brand)"/>
+  <path d="M13.2 18.6 A2.7 2.7 0 0 0 15.9 21.3" stroke="var(--paper-hi)" stroke-width="1.1"
+        stroke-linecap="round" opacity=".7"/>
 </svg>`;
 
-export function buildChrome(rootEl, spec, { onView, onMotion } = {}) {
+export function buildChrome(rootEl, spec, { locale, onView, onMotion, onLocale } = {}) {
   const meta = spec.meta;
+  let lang = locale ?? spec.i18n?.default ?? spec.i18n?.base ?? 'en';
+
+  /** Sheet furniture in the language currently on screen. */
+  const t = (key, fallback) => {
+    const s = chromeText(spec, lang, key);
+    return s === key && fallback != null ? fallback : s;
+  };
+
+  /**
+   * Text that has to be re-read when the language changes — either furniture,
+   * or a spec string that `applyLocale` rewrote in place. Registering the read
+   * rather than the result is what makes the toggle exhaustive: a label nobody
+   * registered would be a label frozen in the language it was built in.
+   */
+  const refresh = [];
+  const dyn = (node, read) => {
+    refresh.push(() => { node.textContent = read(); });
+    return node;
+  };
 
   /* ------------------------------------------------------------ sheet frame */
   const frame = el('div', 'frame');
@@ -84,17 +120,23 @@ export function buildChrome(rootEl, spec, { onView, onMotion } = {}) {
   }
 
   /* ---------------------------------------------------------------- heading */
+  // Top left is the signature: who issued this sheet, not what it is of. It is
+  // the same on every sheet the tool draws, so it comes from the dictionary
+  // like the rest of the furniture — and a spec that wants its own byline
+  // overrides `chrome.brand.signature`. The organisation the *subject* belongs
+  // to is a different fact and lives in the title block, where a drawing has
+  // always carried it.
   const brand = el('div', 'brand');
   brand.innerHTML = LOGO;
   const brandText = el('div');
-  brandText.appendChild(el('div', 'org', meta.org || meta.title));
-  if (meta.division) brandText.appendChild(el('div', 'division', meta.division));
+  brandText.appendChild(dyn(el('div', 'sig'), () => t('brand.signature')));
+  if (meta.division) brandText.appendChild(dyn(el('div', 'division'), () => meta.division));
   brand.appendChild(brandText);
   rootEl.appendChild(brand);
 
   const docTitle = el('div', 'docTitle');
-  docTitle.appendChild(el('div', 't', meta.title));
-  if (meta.subtitle) docTitle.appendChild(el('div', 's', meta.subtitle));
+  docTitle.appendChild(dyn(el('div', 't'), () => meta.title));
+  if (meta.subtitle) docTitle.appendChild(dyn(el('div', 's'), () => meta.subtitle));
   rootEl.appendChild(docTitle);
 
   /* ------------------------------------------------------------ key to items */
@@ -103,7 +145,7 @@ export function buildChrome(rootEl, spec, { onView, onMotion } = {}) {
   if (callouts.length) {
     const key = el('section', 'panel');
     key.id = 'key';
-    key.appendChild(el('h2', null, 'Key to items'));
+    key.appendChild(dyn(el('h2'), () => t('panel.key')));
     const items = el('div', `items${callouts.length <= 5 ? ' single' : ''}`);
 
     // The reference fills column-major: 1-5 left, 6-10 right.
@@ -116,17 +158,23 @@ export function buildChrome(rootEl, spec, { onView, onMotion } = {}) {
     for (const c of ordered) {
       const item = el('div', 'item');
       item.appendChild(el('span', 'bal', String(c.n)));
-      item.appendChild(el('span', 'tx', c.text));
+      item.appendChild(dyn(el('span', 'tx'), () => c.text));
       items.appendChild(item);
       keyItems.set(c.n, item);
     }
     key.appendChild(items);
 
     const metaRow = el('div', 'meta');
-    metaRow.innerHTML =
-      `<span>Projection<b>${meta.projection}</b></span>` +
-      `<span>Units<b>${meta.units}</b></span>` +
-      `<span>Tol.<b>${meta.tolerance}</b></span>`;
+    const FACTS = [
+      ['key.projection', () => t(`projection.${meta.projection}`, meta.projection)],
+      ['key.units', () => meta.units],
+      ['key.tolerance', () => meta.tolerance],
+    ];
+    for (const [k, read] of FACTS) {
+      const cell = el('span');
+      cell.append(dyn(el('span'), () => t(k)), dyn(el('b'), read));
+      metaRow.appendChild(cell);
+    }
     key.appendChild(metaRow);
     rootEl.appendChild(key);
   }
@@ -136,11 +184,11 @@ export function buildChrome(rootEl, spec, { onView, onMotion } = {}) {
   if (spec.instruments?.length) {
     const panel = el('section', 'panel');
     panel.id = 'instr';
-    panel.appendChild(el('h2', null, 'Instrumentation'));
+    panel.appendChild(dyn(el('h2'), () => t('panel.instruments')));
     const rows = el('div', 'rows');
     for (const ins of spec.instruments) {
       const row = el('div', 'row');
-      row.appendChild(el('span', 'k', ins.label));
+      row.appendChild(dyn(el('span', 'k'), () => ins.label));
       const v = el('span', 'v', '—');
       row.appendChild(v);
       rows.appendChild(row);
@@ -156,20 +204,29 @@ export function buildChrome(rootEl, spec, { onView, onMotion } = {}) {
   const tb = meta.titleBlock;
   const block = el('section', 'panel');
   block.id = 'titleblock';
+  if (meta.org) {
+    const tbOrg = el('div', 'tb-org');
+    tbOrg.appendChild(dyn(el('div', 'k'), () => t('tb.org')));
+    tbOrg.appendChild(dyn(el('div', 'v'), () => meta.org));
+    block.appendChild(tbOrg);
+  }
   const tbTitle = el('div', 'tb-title');
-  tbTitle.appendChild(el('div', 'k', 'Title'));
-  tbTitle.appendChild(el('div', 'v', meta.title));
+  tbTitle.appendChild(dyn(el('div', 'k'), () => t('tb.title')));
+  tbTitle.appendChild(dyn(el('div', 'v'), () => meta.title));
   block.appendChild(tbTitle);
   const cells = el('div', 'cells');
   const CELLS = [
-    ['Drawing no.', tb.drawingNo], ['Sheet', tb.sheet], ['Scale', tb.scale], ['Rev.', tb.rev],
-    ['Drawn', tb.drawn], ['Checked', tb.checked], ['Date', tb.date], ['Status', tb.status],
+    ['tb.drawingNo', 'drawingNo'], ['tb.sheet', 'sheet'], ['tb.scale', 'scale'], ['tb.rev', 'rev'],
+    ['tb.drawn', 'drawn'], ['tb.checked', 'checked'], ['tb.date', 'date'], ['tb.status', 'status'],
   ];
-  for (const [k, v] of CELLS) {
+  for (const [k, field] of CELLS) {
     const c = el('div', 'cell');
-    c.appendChild(el('div', 'k', k));
-    const vn = el('div', `v${k === 'Status' ? ' status' : ''}`, v ?? '—');
-    vn.title = v ?? '';
+    c.appendChild(dyn(el('div', 'k'), () => t(k)));
+    const vn = el('div', `v${field === 'status' ? ' status' : ''}`);
+    refresh.push(() => {
+      vn.textContent = tb[field] ?? '—';
+      vn.title = tb[field] ?? '';
+    });
     c.appendChild(vn);
     cells.appendChild(c);
   }
@@ -181,12 +238,13 @@ export function buildChrome(rootEl, spec, { onView, onMotion } = {}) {
   consoleEl.id = 'console';
   const viewButtons = new Map();
   const motionButtons = new Map();
+  const langButtons = new Map();
 
   if (spec.views?.length) {
     const row = el('div', 'ctrlRow');
-    row.appendChild(el('span', 'rowLabel', 'View'));
+    row.appendChild(dyn(el('span', 'rowLabel'), () => t('row.view')));
     for (const v of spec.views) {
-      const b = el('button', 'btn', v.label);
+      const b = dyn(el('button', 'btn'), () => v.label);
       b.type = 'button';
       b.addEventListener('click', () => onView?.(v.id));
       row.appendChild(b);
@@ -196,13 +254,32 @@ export function buildChrome(rootEl, spec, { onView, onMotion } = {}) {
   }
   if (spec.motions?.length) {
     const row = el('div', 'ctrlRow');
-    row.appendChild(el('span', 'rowLabel', 'Motion'));
+    row.appendChild(dyn(el('span', 'rowLabel'), () => t('row.motion')));
     for (const m of spec.motions) {
-      const b = el('button', 'btn', m.label);
+      const b = dyn(el('button', 'btn'), () => m.label);
       b.type = 'button';
       b.addEventListener('click', () => onMotion?.(m.id));
       row.appendChild(b);
       motionButtons.set(m.id, b);
+    }
+    consoleEl.appendChild(row);
+  }
+
+  // The language row appears only when there is a second language to go to.
+  // Button text is each language's own name, never translated — a reader
+  // looking for Chinese is looking for 中文, not for whatever "Chinese" is in
+  // the language they cannot read.
+  const locales = localeList(spec);
+  if (locales.length > 1) {
+    const row = el('div', 'ctrlRow');
+    row.appendChild(dyn(el('span', 'rowLabel'), () => t('row.lang')));
+    for (const l of locales) {
+      const b = el('button', 'btn lang', l.label);
+      b.type = 'button';
+      b.lang = l.code;
+      b.addEventListener('click', () => onLocale?.(l.code));
+      row.appendChild(b);
+      langButtons.set(l.code, b);
     }
     consoleEl.appendChild(row);
   }
@@ -216,7 +293,20 @@ export function buildChrome(rootEl, spec, { onView, onMotion } = {}) {
   caption.append(capC, capS);
   rootEl.appendChild(caption);
 
-  const hint = el('div', null, 'Drag to orbit · Scroll to zoom');
+  let curView = null;
+  function paintCaption() {
+    if (curView?.caption) {
+      capC.textContent = curView.caption;
+      capS.textContent = curView.sub ?? '';
+      capS.style.display = curView.sub ? '' : 'none';
+      caption.classList.add('show');
+    } else {
+      caption.classList.remove('show');
+    }
+  }
+  refresh.push(paintCaption);
+
+  const hint = dyn(el('div'), () => t('hint'));
   hint.id = 'hint';
   rootEl.appendChild(hint);
 
@@ -231,12 +321,31 @@ export function buildChrome(rootEl, spec, { onView, onMotion } = {}) {
   /* ------------------------------------------------------------------- API */
   let hotCallout = null;
 
+  /** Re-read every registered string, and light up the active language. */
+  function paint() {
+    for (const fn of refresh) fn();
+    for (const [code, b] of langButtons) b.classList.toggle('on', code === lang);
+  }
+  paint();
+
   return {
     updateInstruments(scope) {
       for (const r of instrRows) {
         r.node.textContent = formatValue(r.format, r.fn(scope));
       }
     },
+
+    /**
+     * Switch language. The caller has already rewritten the spec's own strings
+     * through `applyLocale`, so this is purely a re-read — the scene, the
+     * camera and any running motion carry on untouched.
+     */
+    setLocale(next) {
+      lang = next;
+      paint();
+    },
+
+    get locale() { return lang; },
 
     setActiveView(id) {
       for (const [k, b] of viewButtons) b.classList.toggle('on', k === id);
@@ -257,14 +366,8 @@ export function buildChrome(rootEl, spec, { onView, onMotion } = {}) {
     },
 
     setCaption(view) {
-      if (view?.caption) {
-        capC.textContent = view.caption;
-        capS.textContent = view.sub ?? '';
-        capS.style.display = view.sub ? '' : 'none';
-        caption.classList.add('show');
-      } else {
-        caption.classList.remove('show');
-      }
+      curView = view ?? null;
+      paintCaption();
     },
 
     /** Highlight the legend row matching a hovered part. */
@@ -280,7 +383,7 @@ export function buildChrome(rootEl, spec, { onView, onMotion } = {}) {
       cardN.textContent = part.name;
       cardD.textContent = part.note ?? '';
       cardD.style.display = part.note ? '' : 'none';
-      const bits = [MATERIAL_LABEL[part.material] ?? part.material];
+      const bits = [t(`material.${part.material}`, part.material)];
       if (part.group) bits.push(part.group);
       cardM.textContent = bits.join(' · ');
       card.classList.add('show');
