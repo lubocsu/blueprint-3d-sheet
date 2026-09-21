@@ -78,6 +78,17 @@
   */
   --card-docked: no;
 
+  /*
+     Whether the item numbering is drawn before anyone asks.
+
+     On is right wherever there is room for the gutters, which is the whole
+     point of a numbered drawing. On a phone held upright the gutters are a
+     fifth of a narrow screen and the drawing pays for them — so there it starts
+     off, the framing takes the margin back, and the toolbar's numbering button
+     puts it right back. Read by `chrome.mjs` like the two above.
+  */
+  --layer-callouts: on;
+
   --ease: cubic-bezier(.4, 0, .2, 1);
 }
 
@@ -922,6 +933,19 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
     overflow: hidden;
   }
   #hoverCard.show { transform: none; }
+}
+
+/*
+   The numbering starts off only on a narrow sheet held UPRIGHT.
+
+   That is where the argument holds: the gutters are horizontal, the width is
+   the scarce axis, and a fifth of it is being kept clear for balloons. Turn the
+   same phone on its side and there are 740px of width — the gutters cost the
+   same fraction of a much larger number, the balloons place perfectly well, and
+   there is nothing to buy by hiding them.
+*/
+@media (max-width: 767px) and (orientation: portrait) {
+  #sheet { --layer-callouts: off; }
 }
 
 /* --- phone, on its side ------------------------------------------------------

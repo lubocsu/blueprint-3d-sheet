@@ -141,6 +141,18 @@ for (const c of spec.annotations?.callouts ?? []) {
   if (!calloutByPart.has(c.anchor)) calloutByPart.set(c.anchor, c.n);
 }
 
+/**
+ * How much wider the drawing may be framed once the numbering is off.
+ *
+ * `DEFAULT_FIT` is 0.78 because the balloon gutters take the rest, so this is
+ * that margin handed back — but not all of it. The gutters are not the only
+ * thing the margin was doing: the sheet has a ruled frame a few pixels in from
+ * the edge, and a subject framed to the last percent puts its gun barrel two
+ * pixels off that line, which reads as a mistake rather than as a full page.
+ * 0.90 keeps a visible band of paper between the drawing and its own border.
+ */
+const NO_GUTTER_GAIN = 0.90 / 0.78;
+
 /* -------------------------------------------------------------------- chrome */
 
 /** Everything a view switch implies, in one place. */
@@ -229,7 +241,12 @@ const chrome = buildChrome(sheet, spec, {
  * so it points at nothing.
  */
 function syncCallouts() {
-  annotations.setCalloutsVisible(chrome.layerOn('callouts') && !chrome.panelsOverlaying);
+  const shown = chrome.layerOn('callouts') && !chrome.panelsOverlaying;
+  annotations.setCalloutsVisible(shown);
+  // The framing margin exists for the gutters. With no balloons to put in them
+  // the drawing may have it back — which is most visible on a phone, where the
+  // margin is a fifth of a narrow screen.
+  viewCtl.setFitGain(shown ? 1 : NO_GUTTER_GAIN);
 }
 
 const annotations = createAnnotations(svg, spec, {
@@ -397,7 +414,13 @@ window.__B2D__ = {
   },
   clearMotions: () => { drivers.reset(); chrome.setActiveMotions([]); annotations.bump(); },
   /** The annotation overlays and the information panels, driven as the console drives them. */
-  setLayer: (key, on) => { chrome.setLayer(key, on); return chrome.layerOn(key); },
+  setLayer: (key, on) => {
+    // `byReader`, like `setPanel` below: this hook stands in for a press on the
+    // console, and a press is a decision the layout does not get to revise on
+    // the next resize.
+    chrome.setLayer(key, on, { byReader: true });
+    return chrome.layerOn(key);
+  },
   layerOn: (key) => chrome.layerOn(key),
   setPanel: (key, open) => chrome.setPanel(key, open, { byReader: true }),
   /** Language, driven exactly as the console button drives it. */

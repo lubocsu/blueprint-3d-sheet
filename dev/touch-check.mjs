@@ -184,6 +184,55 @@ console.log('\nlayout — what a coarse pointer gets instead of hover');
   ok(probe.overlay === 'yes', 'and open over the drawing rather than beside it');
 }
 
+/* --------------------------------------------------- numbering and framing */
+
+/*
+ * The one overlay that starts OFF on a narrow upright sheet, and the framing
+ * that is coupled to it.
+ *
+ * `DEFAULT_FIT` is 0.78 because the balloon gutters take the rest, and the
+ * gutters are horizontal — so on a phone a fifth of the only scarce axis is
+ * being held for balloons nobody has asked for yet. Switching the numbering
+ * back on has to hand that width straight back, or the drawing would keep the
+ * space and the balloons would be laid out over it.
+ */
+console.log('\nnumbering — off by default here, and the framing knows');
+{
+  const width = () => page.evaluate(() => {
+    const B = window.__B2D__;
+    const [mn, mx] = B.fitBoxes().rest;
+    const V = B.stage.camera.position.constructor;
+    const xs = [];
+    for (const x of [mn[0], mx[0]]) for (const y of [mn[1], mx[1]]) for (const z of [mn[2], mx[2]]) {
+      const v = new V(x, y, z); v.project(B.stage.camera);
+      xs.push((v.x * 0.5 + 0.5) * innerWidth);
+    }
+    return (Math.max(...xs) - Math.min(...xs)) / innerWidth;
+  });
+  const balloons = () => page.evaluate(() =>
+    [...document.querySelectorAll('#ann .balloon')].filter((c) => c.style.display !== 'none').length);
+
+  await page.evaluate(() => window.__B2D__.setView('iso'));
+  await settle(1600);
+  const offOn = await page.evaluate(() => window.__B2D__.layerOn('callouts'));
+  const wideFill = await width();
+  ok(offOn === false, 'the numbering starts off on a narrow upright sheet');
+  ok(wideFill > 0.88, 'and the drawing has the gutter margin back',
+    `${Math.round(wideFill * 100)}% of the width`);
+  ok(wideFill <= 1, 'without being cropped by it', `${Math.round(wideFill * 100)}%`);
+
+  await page.evaluate(() => window.__B2D__.setLayer('callouts', true));
+  await settle(1800);
+  const backFill = await width();
+  const n = await balloons();
+  ok(n > 0, 'one press brings the balloons back', `${n} drawn`);
+  ok(backFill < wideFill - 0.05, 'and the framing gives the gutters their width again',
+    `${Math.round(wideFill * 100)}% -> ${Math.round(backFill * 100)}%`);
+
+  await page.evaluate(() => window.__B2D__.setLayer('callouts', false));
+  await settle(900);
+}
+
 /* ------------------------------------------------- a narrow window, a mouse */
 
 /*

@@ -208,6 +208,13 @@ export function buildChrome(rootEl, spec, {
   /** Set from `--card-docked`; see `showCard`. */
   let cardDocked = false;
 
+  /**
+   * Layers the reader has decided about, kept apart from the panels' set only
+   * because they are asked at different moments. Same rule: once a reader has
+   * said what they want, a resize does not get to revise it.
+   */
+  const decidedLayers = new Set();
+
   const panelState = (key) => rootEl.getAttribute(`data-panel-${key}`) ?? 'open';
 
   function setPanel(key, open, { byReader = false } = {}) {
@@ -233,6 +240,17 @@ export function buildChrome(rootEl, spec, {
       if (!panelNodes.has(p.key)) continue;
       const want = cs.getPropertyValue(`--panel-${p.key}`).trim() || 'open';
       rootEl.setAttribute(`data-panel-${p.key}`, want === 'shut' ? 'shut' : 'open');
+    }
+    // The layers are the same question asked about the overlays. Set the state
+    // and light the button; the caller re-reads it and tells the annotation
+    // layer, which is why nothing is notified from in here — this also runs
+    // during `buildChrome`, before there is an annotation layer to tell.
+    for (const l of LAYERS) {
+      if (decidedLayers.has(l.key)) continue;
+      const want = cs.getPropertyValue(`--layer-${l.key}`).trim() || 'on';
+      const on = want !== 'off';
+      rootEl.setAttribute(`data-layer-${l.key}`, on ? 'on' : 'off');
+      layerButtons.get(l.key)?.classList.toggle('on', on);
     }
     paintPanelButtons();
   }
@@ -437,7 +455,7 @@ export function buildChrome(rootEl, spec, {
       const b = iconButton(uiGlyph(l.glyph), () => t(l.name));
       b.addEventListener('click', () => {
         const next = rootEl.getAttribute(`data-layer-${l.key}`) !== 'off';
-        setLayer(l.key, !next);
+        setLayer(l.key, !next, { byReader: true });
       });
       row.appendChild(b);
       layerButtons.set(l.key, b);
@@ -509,9 +527,10 @@ export function buildChrome(rootEl, spec, {
    * Both layers start on, which is what the annotation and dimension modules
    * already default to, so there is nothing to tell anyone about.
    */
-  function setLayer(key, on, { notify = true } = {}) {
+  function setLayer(key, on, { notify = true, byReader = false } = {}) {
     rootEl.setAttribute(`data-layer-${key}`, on ? 'on' : 'off');
     layerButtons.get(key)?.classList.toggle('on', on);
+    if (byReader) decidedLayers.add(key);
     if (notify) onLayer?.(key, on);
   }
 
@@ -573,9 +592,8 @@ export function buildChrome(rootEl, spec, {
     for (const [code, b] of langButtons) b.classList.toggle('on', code === lang);
   }
 
-  // Layers start on: a drawing without its numbering is not the default state
-  // of a drawing, it is a choice the reader makes.
-  for (const l of LAYERS) setLayer(l.key, true, { notify: false });
+  // Both the panels and the layers take their opening state from the stylesheet,
+  // which is the only thing that knows how wide the sheet is.
   applyPanelDefaults();
   paint();
 

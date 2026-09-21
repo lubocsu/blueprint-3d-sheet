@@ -255,6 +255,16 @@ correct, and also in the way while you are turning the thing over to look at its
 shape. Dimensions start on — a plate without one is not a plate, and the quality
 gate says so.
 
+The framing follows. `0.78` — how much of the sheet the drawing fills — is not
+a taste, it is the width the balloon gutters occupy, so with the numbering off
+the drawing gets it back. On a narrow sheet held upright that is the difference
+between filling 79% of the width and 94% of it, which is why the numbering is
+the one thing that starts **off** there: the gutters are horizontal, the width
+is the only scarce axis on a phone, and a fifth of it was being held for
+balloons before anyone asked for them. One press puts them back, and the
+framing eases in behind them. A reader who presses it keeps that answer through
+every later resize — their choice outranks the layout's.
+
 **The three panels fold**, each to the handle in its own corner, and they step
 aside on their own while the picture is moving — off the same clock that fades
 the annotation layer, so the panels and the balloons leave and return together

@@ -18,6 +18,9 @@ const FOV_PERSP = 30;
 const FOV_ORTHO = 2.2;
 const TWEEN_MS = 900;
 
+/** See the cap in `update`: headroom for the orthographic/perspective mismatch. */
+const FIT_CEILING = 0.93;
+
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const shortestAngle = (from, to) => from + (((to - from) % 360) + 540) % 360 - 180;
 
@@ -28,6 +31,16 @@ export function createViewController(camera, spec, { sceneDiag = 10, bbox = null
   // Leaves room for the balloon gutters and the dimension run. Filling more of
   // the sheet than this pushes the annotation hard against the frame.
   const DEFAULT_FIT = 0.78;
+
+  /**
+   * How much of that margin is actually needed right now.
+   *
+   * The 0.78 above is not a taste; it is the width the gutters occupy. With the
+   * numbering switched off there are no gutters, and the margin is holding back
+   * a drawing for annotation that is not being drawn. 1 means "leave it all",
+   * which is what a sheet showing its balloons asks for.
+   */
+  let fitGain = 1;
 
   // The eight corners of the fit bounding box. Projecting these onto the
   // camera's basis gives the exact on-screen extent for any view direction,
@@ -153,7 +166,13 @@ export function createViewController(camera, spec, { sceneDiag = 10, bbox = null
     // Re-fit every frame: it is eight dot products, and doing it continuously
     // means the framing stays correct through a tween, an orbit and a resize
     // without any invalidation bookkeeping.
-    const fit = state.fit * state.zoom;
+    // Capped well short of 1. `fitDistance` measures the silhouette
+    // ORTHOGRAPHICALLY — eight dot products onto the camera basis — while the
+    // scene renders in perspective, so the near corner of a long subject lands
+    // bigger than the estimate and the real extent overshoots `fit` by a few
+    // per cent. At 0.78 that slack is invisible. Near 1 it is the difference
+    // between a framed drawing and a cropped one.
+    const fit = Math.min(state.fit * fitGain, FIT_CEILING) * state.zoom;
     const dist = fitDistance(state.az, state.el, state.fov, state.target, fit) * state.distMul;
 
     const el = Math.max(-89.5, Math.min(89.5, state.el)) * DEG;
@@ -181,6 +200,13 @@ export function createViewController(camera, spec, { sceneDiag = 10, bbox = null
     setView,
     update,
     setFitBounds,
+
+    /**
+     * Give back the margin the annotation layer is not using. See `fitGain`.
+     * Re-framing is continuous, so this takes effect over the next few frames
+     * rather than jumping.
+     */
+    setFitGain(g) { fitGain = Math.max(1, Number(g) || 1); },
     get currentId() { return currentId; },
     get current() { return views.find((v) => v.id === currentId) ?? null; },
     get isOrtho() { return state.fov < (FOV_PERSP + FOV_ORTHO) / 2; },
