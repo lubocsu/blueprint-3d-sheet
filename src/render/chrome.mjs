@@ -205,6 +205,9 @@ export function buildChrome(rootEl, spec, {
   const decided = new Set();
   const panelNodes = new Map();
 
+  /** Set from `--card-docked`; see `showCard`. */
+  let cardDocked = false;
+
   const panelState = (key) => rootEl.getAttribute(`data-panel-${key}`) ?? 'open';
 
   function setPanel(key, open, { byReader = false } = {}) {
@@ -223,6 +226,8 @@ export function buildChrome(rootEl, spec, {
    */
   function applyPanelDefaults() {
     const cs = getComputedStyle(rootEl);
+    // Read here rather than in `showCard`, which runs every frame.
+    cardDocked = cs.getPropertyValue('--card-docked').trim() === 'yes';
     for (const p of PANELS) {
       if (decided.has(p.key)) continue;
       if (!panelNodes.has(p.key)) continue;
@@ -676,9 +681,12 @@ export function buildChrome(rootEl, spec, {
       cardM.textContent = bits.join(' · ');
       card.classList.add('show');
 
-      // A card pinned to the bottom of a phone screen is placed by the
-      // stylesheet, not by a pointer that is a finger somewhere else.
-      if (coarsePointer()) {
+      // A docked card is placed entirely by the stylesheet. Writing `top` here
+      // as well would give a fixed box both a top and a bottom and it would
+      // stretch to span them — which is not a near miss, it is most of the
+      // screen. Clearing both is also what restores it if the window was
+      // narrow a moment ago and is not any more.
+      if (cardDocked) {
         card.style.left = '';
         card.style.top = '';
         return;

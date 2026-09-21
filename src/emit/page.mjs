@@ -48,18 +48,7 @@ export async function bundleRuntime({ minify = true, force = false } = {}) {
  * @param {object} opts
  * @returns {Promise<{ html: string, bytes: number }>}
  */
-/**
- * Which of the stylesheet's layouts the page opens in.
- *
- * Carried as a build option rather than a spec field: it is a decision about
- * the SHEET's furniture, not about the subject, and three sheets of the same
- * machine should not disagree about where the toolbar is. `dev/chrome-lab.mjs`
- * flips it on a built page to compare them side by side.
- */
-export const CHROME_LAYOUTS = ['a', 'b', 'c'];
-const DEFAULT_LAYOUT = 'a';
-
-export async function renderPage(spec, { minify = true, embedFont = null, chrome = DEFAULT_LAYOUT } = {}) {
+export async function renderPage(spec, { minify = true, embedFont = null } = {}) {
   const [template, styles, bundle] = await Promise.all([
     readFile(join(ROOT, 'templates/page.html'), 'utf8'),
     readFile(join(ROOT, 'templates/styles.css'), 'utf8'),
@@ -81,10 +70,7 @@ export async function renderPage(spec, { minify = true, embedFont = null, chrome
   // typography rules apply before any script runs.
   const lang = String(spec.i18n?.default ?? spec.i18n?.base ?? 'en').replace(/[^A-Za-z0-9-]/g, '') || 'en';
 
-  const layout = CHROME_LAYOUTS.includes(chrome) ? chrome : DEFAULT_LAYOUT;
-
   const html = template
-    .replace('{{CHROME}}', layout)
     .replace('{{LANG}}', lang)
     .replace('{{TITLE}}', String(
       spec.i18n?.locales?.[lang]?.strings?.['meta.title'] ?? spec.meta?.title ?? 'Assembly',

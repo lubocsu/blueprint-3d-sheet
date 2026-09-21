@@ -14,8 +14,9 @@
      them, including again after a resize crosses a breakpoint. So changing
      which panels a layout starts with is a one-line change in this file.
 
-   - `data-chrome` selects the layout. Three are carried while the direction is
-     being chosen; `dev/chrome-lab.html` switches between them on a real page.
+   - `dev/chrome-lab.html` renders a real built page at each breakpoint, in both
+     languages, with the views and motions drivable — which is where any change
+     in here should be looked at before it ships.
 */
 
 :root {
@@ -64,6 +65,18 @@
      phone breakpoint.
   */
   --panel-overlay: no;
+
+  /*
+     Whether the hover card FOLLOWS the pointer or is DOCKED to an edge.
+
+     Also a width question, and also read back by `chrome.mjs`, for a sharper
+     reason than the one above: a docked card is placed by `bottom` here, and a
+     followed card is placed by `top` from there. A `position: fixed` box given
+     both, with no height of its own, stretches to span them — so the card that
+     should have named one part filled half the screen. The two must not be able
+     to disagree, so there is one declaration and the runtime reads it.
+  */
+  --card-docked: no;
 
   --ease: cubic-bezier(.4, 0, .2, 1);
 }
@@ -662,91 +675,26 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
    differ only in where the console sits and which panels a width opens with.
    ====================================================================== */
 
-/* --- a · quiet yield --------------------------------------------------------
-   The sheet as drawn, in full, until you touch it. Every panel is open on a
-   desk and each folds in place from its own header; the console stays in the
-   corner it has always been in. The panel group in the console is redundant
-   here and steps out of the way. */
-
-#sheet[data-chrome="a"] {
-  --panel-key: open; --panel-instr: open; --panel-tb: open;
-}
 /*
-   The legend and the readouts each carry their own handle in their header, so
-   the console does not repeat them. The title block does not — a drawing's
-   title block has never had a heading over it and it does not get one here —
-   so its handle stays in the console, next to the one that puts all three away
-   at once.
-*/
-#sheet[data-chrome="a"] #console [data-group="panel"] .btn[data-panel="key"],
-#sheet[data-chrome="a"] #console [data-group="panel"] .btn[data-panel="instr"] { display: none; }
-#sheet[data-chrome="a"] #titleblock > h2 { display: none; }
-#sheet[data-chrome="a"][data-panel-tb="shut"] #titleblock > h2 { display: flex; }
-
-/* --- b · instrument rail ----------------------------------------------------
-   The panel handles come out of the console and dock as a rail inside the left
-   frame edge, the way a modelling application racks its tools; the console
-   itself becomes a horizontal bar centred on the bottom edge. The title block
-   starts folded — on a wide screen it is the panel a reader consults least and
-   the one that covers the most drawing. */
-
-#sheet[data-chrome="b"] {
-  --panel-key: open; --panel-instr: open; --panel-tb: shut;
-}
-/*
-   Centred by auto margins, NOT by a transform.
-
-   A transformed element becomes the containing block for `position: fixed`
-   descendants, and the panel rail below is one — with `translateX(-50%)` here
-   it docked itself to the middle of the toolbar instead of to the left edge of
-   the window, landing on top of the view buttons. Auto margins centre the box
-   without creating that containing block.
-*/
-#sheet[data-chrome="b"] #console {
-  left: 0; right: 0;
-  width: max-content;
-  max-width: calc(100vw - var(--pad) * 3.8);
-  margin-inline: auto;
-  grid-auto-flow: column;
-  align-items: center;
-  gap: 9px;
-}
-#sheet[data-chrome="b"] #console .ctrlRow + .ctrlRow {
-  border-left: 1px solid color-mix(in srgb, var(--ink) 32%, transparent);
-  padding-left: 9px;
-}
-#sheet[data-chrome="b"] #console .rowLabel { display: none; }
-#sheet[data-chrome="b"] #console [data-group="panel"] {
-  position: fixed;
-  left: calc(var(--pad) * 1.15);
-  top: 50%;
-  translate: 0 -50%;
-  flex-direction: column;
-  gap: 0;
-  padding: 3px;
-  border: 1.4px solid var(--rule);
-  background: color-mix(in srgb, var(--panel) 93%, transparent);
-}
-/* The rail is not part of the toolbar's rhythm — it must not take the rule
-   that separates one console group from the next. */
-#sheet[data-chrome="b"] #console [data-group="panel"] {
-  border-left-width: 1.4px;
-  padding-left: 3px;
-}
-#sheet[data-chrome="b"] #console [data-group="panel"] .btn { border-width: 1.2px; }
-/* The rail owns the left edge, so the legend starts to the right of it. */
-#sheet[data-chrome="b"] #key { left: calc(var(--pad) * 1.9 + var(--hit) + 16px); }
-#sheet[data-chrome="b"] #titleblock > h2 { display: flex; }
-
-/* --- c · viewport first -----------------------------------------------------
    Nothing on the glass but the frame, the title, the drawing and the toolbar.
-   Every panel is one press away and the same layout serves a phone and a
-   desk — which is the whole argument for it. */
+   Every panel is one press away, and a phone and a desk get the same layout —
+   which is the whole argument for it. Two other arrangements were carried here
+   while the direction was being chosen; this is the one that was picked.
+*/
 
-#sheet[data-chrome="c"] {
+#sheet {
   --panel-key: shut; --panel-instr: shut; --panel-tb: shut;
 }
-#sheet[data-chrome="c"] #console {
+
+/*
+   The toolbar is centred by AUTO MARGINS, not by a transform.
+
+   A transformed element becomes the containing block for any `position: fixed`
+   descendant, which silently re-anchors it to the toolbar instead of to the
+   window. That cost an afternoon when a panel rail was nested in here; auto
+   margins centre the box without creating the trap.
+*/
+#console {
   left: 0; right: 0;
   width: max-content;
   max-width: calc(100vw - var(--pad) * 3.8);
@@ -755,12 +703,17 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
   align-items: center;
   gap: 9px;
 }
-#sheet[data-chrome="c"] #console .ctrlRow + .ctrlRow {
+#console .ctrlRow + .ctrlRow {
   border-left: 1px solid color-mix(in srgb, var(--ink) 32%, transparent);
   padding-left: 9px;
 }
-#sheet[data-chrome="c"] #console .rowLabel { display: none; }
-#sheet[data-chrome="c"] #titleblock > h2 { display: flex; }
+/* The groups are told apart by the rules between them and by the glyphs
+   themselves; a word in front of each is a third way of saying it. */
+#console .rowLabel { display: none; }
+
+/* Every panel is reached from the toolbar here, the title block included, so
+   it carries a header like the other two. */
+#titleblock > h2 { display: flex; }
 
 /* ======================================================================
    WIDTHS
@@ -778,10 +731,6 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
   #titleblock .cell:nth-child(2n) { border-right: 0; }
   #titleblock .cell:nth-child(n+3) { border-top: 1px solid #aeb9c9; }
 
-  /* One panel's worth of drawing is worth more than three panels' worth of
-     text at this width, so the two that sit over the model start folded. */
-  #sheet[data-chrome="a"] { --panel-instr: shut; --panel-tb: shut; }
-  #sheet[data-chrome="b"] { --panel-instr: shut; --panel-tb: shut; }
 }
 
 /* --- phone ----------------------------------------------------------------- */
@@ -831,28 +780,11 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
     overflow: hidden;
   }
 
-  /* Every layout is the same layout here: folded panels, one toolbar along the
-     bottom. There is no width at which three panels and a drawing both fit. */
-  #sheet[data-chrome="a"],
-  #sheet[data-chrome="b"],
-  #sheet[data-chrome="c"] {
-    --panel-key: shut; --panel-instr: shut; --panel-tb: shut;
-    --panel-overlay: yes;
-  }
-  /* Every handle is in the console here: the folded panels are corner tiles
-     and their headers are what you press to put them away again. */
-  #sheet[data-chrome="a"] #console [data-group="panel"] .btn[data-panel="key"],
-  #sheet[data-chrome="a"] #console [data-group="panel"] .btn[data-panel="instr"] { display: inline-grid; }
-  #sheet[data-chrome="a"] #titleblock > h2 { display: flex; }
-  #sheet[data-chrome="b"] #console [data-group="panel"] {
-    position: static;
-    transform: none;
-    flex-direction: row;
-    border: 0;
-    background: none;
-    padding: 0;
-  }
-  #sheet[data-chrome="b"] #key { left: 50%; }
+  /* An open panel covers the drawing here rather than sitting beside it, and
+     the card that names a part docks to an edge instead of chasing a finger.
+     Both are read back by the runtime — see the declarations at the top, and
+     `--card-docked` in particular for what happens when they disagree. */
+  #sheet { --panel-overlay: yes; --card-docked: yes; }
 
   /*
      An open panel on a phone takes the paper.
@@ -977,6 +909,17 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
     top: auto;
     max-width: none;
     transform: translateY(6px);
+    /* A part may carry a long note, and this card cannot be scrolled — it is
+       `pointer-events: none` so a finger would scroll the model behind it. Four
+       lines is what a caption is for; the legend is where the full text lives. */
+    max-height: 34dvh;
+    overflow: hidden;
+  }
+  #hoverCard .d {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
   }
   #hoverCard.show { transform: none; }
 }

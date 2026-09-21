@@ -4,14 +4,19 @@
 <meta charset="utf-8">
 <title>chrome lab</title>
 <!--
-  Comparing the sheet's three layouts on a REAL page.
+  The sheet's chrome, at every width, on a REAL page.
 
   Not a mock-up. The frame below loads a built `index.html` — the same file the
   demo site publishes, with its own three.js scene, its own spec and both its
-  languages — and this page only flips `data-chrome` on it and resizes the
-  viewport around it. So what you are comparing is the thing itself at the width
-  you chose, including how each layout sits over the actual model, and any CSS
-  written to win an argument here is CSS that already shipped.
+  languages — and this page only resizes the viewport around it and drives it
+  through `window.__B2D__`. So what you are looking at is the thing itself at
+  the width you chose, and any CSS written to win an argument here is CSS that
+  already shipped.
+
+  It was built to compare three candidate layouts side by side. One was chosen,
+  the other two are gone, and what it is still for is the part that does not go
+  away: seeing the chosen chrome at a phone width, in Chinese, with a motion
+  running, without owning a phone.
 
   The frame is sized in LOGICAL pixels and scaled down to fit the pane, so the
   stylesheet's breakpoints evaluate against the width on the label rather than
@@ -110,12 +115,7 @@
 <div id="warn" hidden></div>
 <aside>
   <h1>chrome lab</h1>
-  <p class="sub">Three layouts, one real page.</p>
-
-  <fieldset>
-    <legend>layout</legend>
-    <div class="opts" id="variants"></div>
-  </fieldset>
+  <p class="sub">One real page, every width.</p>
 
   <fieldset>
     <legend>viewport</legend>

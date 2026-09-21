@@ -266,16 +266,23 @@ because nothing hovers there and an unlabelled icon is a guess. One finger
 orbits, two pinch, a tap names a part and keeps naming it until you tap
 somewhere else.
 
-Three layouts ship while the direction is being chosen — `a` keeps the sheet and
-lets it yield, `b` racks the handles on the left edge, `c` shows nothing but the
-drawing — selected by `data-chrome` on `#sheet` and compared side by side on a
-real built page:
+The sheet therefore **opens as a viewport**: the frame, the byline, the title,
+the drawing and the toolbar, with every panel one press away. A phone and a desk
+get the same arrangement, which is most of the argument for it.
+
+To look at any of this without owning a phone, `dev/chrome-lab.html` renders a
+real built page at each breakpoint, in both languages, with the views, motions,
+overlays and panels drivable from the side:
 
 ```bash
+node bin/b2d.mjs build examples/mbt-mk6/spec.json --out out/mbt-mk6
 node bin/b2d.mjs serve
 ```
 
-then open `http://localhost:5178/dev/chrome-lab.html`.
+then open `http://localhost:5178/dev/chrome-lab.html`. If that port is taken —
+several worktrees, one default — the server now says so and hands you the next
+one, because the alternative was another worktree's server answering with its
+own files.
 
 ## Two languages, two standards
 

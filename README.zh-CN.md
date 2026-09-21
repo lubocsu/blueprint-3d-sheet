@@ -216,14 +216,20 @@ CLI 里还有 `ingest`、`research`、`bundle` 三条命令。它们尚未完成
 图标下带名字 —— 触屏没有悬停，没有文字的图标只能靠猜。单指旋转、双指缩放，点按会说出
 零件的名字，并一直显示到你点别处为止。
 
-方向未定期间随包发布三套布局 —— `a` 保留图纸并让它让位，`b` 把手柄架在左边缘，
-`c` 只留下图形 —— 由 `#sheet` 上的 `data-chrome` 选择，并在一张真的已构建页面上并排比较：
+所以这张图纸**以视口的形态打开**：图框、签名、图名、图形和工具条，每个栏目都只有一次
+按压之遥。手机和桌面拿到同一套安排——这基本上就是选它的全部理由。
+
+不必真有一部手机才能看这些：`dev/chrome-lab.html` 会在每个断点下加载一张真的已构建
+页面，中英文皆可，视图、动作、图层和栏目都能从侧边驱动：
 
 ```bash
+node bin/b2d.mjs build examples/mbt-mk6/spec.json --out out/mbt-mk6
 node bin/b2d.mjs serve
 ```
 
-然后打开 `http://localhost:5178/dev/chrome-lab.html`。
+然后打开 `http://localhost:5178/dev/chrome-lab.html`。若该端口被占 —— 多个 worktree，
+一个默认端口 —— 服务器现在会明说并让出下一个；否则另一个 worktree 的服务器会拿它自己的
+文件来回应你。
 
 ## 两种语言，两套标准
 

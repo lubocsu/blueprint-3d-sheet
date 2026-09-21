@@ -21,6 +21,10 @@
  *                            per-frame pick would clear the card instantly
  *   bare paper clears it     and nothing else does
  *
+ * Plus one case that is neither a phone nor a desk — a narrow window with a
+ * mouse — because that is where the stylesheet's idea of the layout and the
+ * runtime's idea of it can disagree while neither looks wrong on its own.
+ *
  *   node dev/touch-check.mjs out/mbt-mk6/index.html
  */
 
@@ -178,6 +182,62 @@ console.log('\nlayout — what a coarse pointer gets instead of hover');
     'console buttons show their name, not just a glyph', `"${probe.labelText}"`);
   ok(probe.panelsShut, 'the panels start folded at this width');
   ok(probe.overlay === 'yes', 'and open over the drawing rather than beside it');
+}
+
+/* ------------------------------------------------- a narrow window, a mouse */
+
+/*
+ * The case that is neither a desk nor a phone, and is therefore the one nobody
+ * looks at: a narrow viewport driven by a POINTER THAT HOVERS. A resized
+ * desktop window, a small laptop, a tablet with a trackpad.
+ *
+ * It earned its own section by producing a real defect. The stylesheet docks
+ * the hover card to an edge below 768px, using `bottom`; the runtime placed it
+ * under the pointer using `top`. The runtime decided which to do by asking
+ * whether the pointer was coarse, and the stylesheet by asking how wide the
+ * window was — two different questions that agree on a phone and on a desk and
+ * disagree exactly here. A `position: fixed` box given both a top and a bottom
+ * stretches to span them, so the card naming one part became half the screen.
+ *
+ * Both now read one declaration, `--card-docked`. This is what says they still
+ * do — and note that the coarse-pointer checks above would never have caught
+ * it, because a phone is one of the two cases where the two questions agree.
+ */
+console.log('\na narrow window with a mouse — where the two layout opinions meet');
+{
+  const narrow = await browser.newPage();
+  const narrowErrors = [];
+  narrow.on('pageerror', (e) => narrowErrors.push(String(e)));
+  // Deliberately NOT hasTouch: this pointer hovers.
+  await narrow.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+  await narrow.goto(pathToFileURL(resolve(page$)).href, { waitUntil: 'load', timeout: 60000 });
+  await narrow.waitForFunction('window.__B2D__ && window.__B2D__.ready', { timeout: 30000 });
+  await new Promise((r) => setTimeout(r, 1400));
+
+  let card = null;
+  for (let y = 330; y < 620 && !card; y += 22) {
+    for (let x = 110; x < 290; x += 26) {
+      await narrow.mouse.move(x, y);
+      await new Promise((r) => setTimeout(r, 70));
+      card = await narrow.evaluate(() => {
+        const c = document.getElementById('hoverCard');
+        if (!c.classList.contains('show')) return null;
+        const r = c.getBoundingClientRect();
+        return { w: Math.round(r.width), h: Math.round(r.height), vh: innerHeight };
+      });
+      if (card) break;
+    }
+  }
+
+  if (!card) {
+    ok(false, 'a part could be hovered at this width', 'nothing hit across the sweep');
+  } else {
+    const share = card.h / card.vh;
+    ok(share < 0.25, 'the card that names a part stays a card',
+      `${card.w}x${card.h} = ${Math.round(share * 100)}% of the viewport height`);
+  }
+  ok(narrowErrors.length === 0, 'nothing threw at this width', narrowErrors.slice(0, 2).join(' | '));
+  await narrow.close();
 }
 
 console.log('\nno runtime errors');

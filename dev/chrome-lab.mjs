@@ -1,21 +1,14 @@
 /**
  * The chrome lab's controls.
  *
- * Everything here drives a built page through the two doors it already opens:
- * the `data-chrome` attribute on `#sheet`, and `window.__B2D__`, which is the
- * same surface `selftest` drives. Nothing is simulated and nothing is stubbed —
- * if a layout looks right in here it will look the same in the file, because it
- * IS the file.
+ * Everything here drives a built page through the door it already opens:
+ * `window.__B2D__`, the same surface `selftest` drives. Nothing is simulated
+ * and nothing is stubbed — if the chrome looks right in here it will look the
+ * same in the file, because it IS the file.
  *
  * Same-origin is the only requirement, which is why this is served by
  * `dev/serve.mjs` from the repository root rather than opened off a file:// path.
  */
-
-const VARIANTS = [
-  ['a', 'a · quiet yield', 'the sheet in full; it steps aside while you move it'],
-  ['b', 'b · instrument rail', 'handles rack on the left edge, toolbar centred'],
-  ['c', 'c · viewport first', 'nothing but the drawing until you ask'],
-];
 
 const SIZES = [
   { w: 1600, h: 950, name: 'desktop' },
@@ -37,7 +30,6 @@ const caption = document.getElementById('caption');
 const warn = document.getElementById('warn');
 
 const state = {
-  variant: 'a',
   size: SIZES[0],
   sheet: SHEETS[0][0],
   lang: null,
@@ -98,13 +90,11 @@ function fitShell() {
   shell.style.transform = `scale(${k})`;
   shell.parentElement.style.width = `${w * k}px`;
   shell.parentElement.style.height = `${h * k}px`;
-  caption.textContent = `${w} x ${h} · ${state.size.name} · layout ${state.variant}`
+  caption.textContent = `${w} x ${h} · ${state.size.name}`
     + ` · ${k < 1 ? `${Math.round(k * 100)}%` : '1:1'}`;
 }
 
 function applyToFrame() {
-  const el = sheetEl();
-  if (el) el.setAttribute('data-chrome', state.variant);
   const b2d = api();
   if (b2d && state.lang && b2d.locale !== state.lang) b2d.setLocale(state.lang);
   renderLangs();
@@ -119,7 +109,6 @@ function render() {
   } else {
     applyToFrame();
   }
-  paintPressed(document.getElementById('variants'), (v) => v === state.variant);
   paintPressed(document.getElementById('sizes'), (v) => v === sizeKey(state.size));
   paintPressed(document.getElementById('sheets'), (v) => v === state.sheet);
 }
@@ -186,12 +175,6 @@ function renderDrive() {
 
 /* --------------------------------------------------------------------- boot */
 
-buttons(
-  document.getElementById('variants'),
-  VARIANTS.map(([v, label, hint]) => ({ value: v, label, hint })),
-  (v) => v === state.variant,
-  (it) => { state.variant = it.value; },
-);
 buttons(
   document.getElementById('sizes'),
   SIZES.map((s) => ({ value: sizeKey(s), label: `${s.w} x ${s.h}`, hint: s.name })),
