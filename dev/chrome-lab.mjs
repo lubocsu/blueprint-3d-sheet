@@ -18,12 +18,13 @@ const VARIANTS = [
 ];
 
 const SIZES = [
-  [1600, 950, 'desktop'],
-  [1280, 800, 'laptop'],
-  [834, 1112, 'tablet · portrait'],
-  [390, 844, 'phone · portrait'],
-  [740, 360, 'phone · landscape'],
+  { w: 1600, h: 950, name: 'desktop' },
+  { w: 1280, h: 800, name: 'laptop' },
+  { w: 834, h: 1112, name: 'tablet · portrait' },
+  { w: 390, h: 844, name: 'phone · portrait' },
+  { w: 740, h: 360, name: 'phone · landscape' },
 ];
+const sizeKey = (s) => `${s.w}x${s.h}`;
 
 const SHEETS = [
   ['/out/mbt-mk6/index.html', 'mbt-mk6', '16 callouts, 7 views, 6 motions'],
@@ -87,7 +88,7 @@ function paintPressed(host, isOn) {
 /* -------------------------------------------------------------------- frame */
 
 function fitShell() {
-  const [w, h] = state.size;
+  const { w, h } = state.size;
   shell.style.width = `${w}px`;
   shell.style.height = `${h}px`;
   const box = shell.parentElement.parentElement.getBoundingClientRect();
@@ -97,7 +98,8 @@ function fitShell() {
   shell.style.transform = `scale(${k})`;
   shell.parentElement.style.width = `${w * k}px`;
   shell.parentElement.style.height = `${h * k}px`;
-  caption.textContent = `${w} x ${h} · ${state.size[2]} · layout ${state.variant} · ${k < 1 ? `${Math.round(k * 100)}%` : '1:1'}`;
+  caption.textContent = `${w} x ${h} · ${state.size.name} · layout ${state.variant}`
+    + ` · ${k < 1 ? `${Math.round(k * 100)}%` : '1:1'}`;
 }
 
 function applyToFrame() {
@@ -118,7 +120,7 @@ function render() {
     applyToFrame();
   }
   paintPressed(document.getElementById('variants'), (v) => v === state.variant);
-  paintPressed(document.getElementById('sizes'), (v) => v === state.size.join('x'));
+  paintPressed(document.getElementById('sizes'), (v) => v === sizeKey(state.size));
   paintPressed(document.getElementById('sheets'), (v) => v === state.sheet);
 }
 
@@ -192,9 +194,9 @@ buttons(
 );
 buttons(
   document.getElementById('sizes'),
-  SIZES.map((s) => ({ value: s.join('x'), label: `${s[0]} x ${s[1]}`, hint: s[2] })),
-  (v) => v === state.size.join('x'),
-  (it) => { state.size = SIZES.find((s) => s.join('x') === it.value); },
+  SIZES.map((s) => ({ value: sizeKey(s), label: `${s.w} x ${s.h}`, hint: s.name })),
+  (v) => v === sizeKey(state.size),
+  (it) => { state.size = SIZES.find((s) => sizeKey(s) === it.value); },
 );
 buttons(
   document.getElementById('sheets'),
