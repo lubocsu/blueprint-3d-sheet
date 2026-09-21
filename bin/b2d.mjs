@@ -267,8 +267,19 @@ async function cmdSelftest() {
       const onPanel = balloons.filter((b) =>
         panels.some((r) => b.x > r.left - 6 && b.x < r.right + 6 && b.y > r.top - 6 && b.y < r.bottom + 6)).length;
 
+      // Every view and motion button should carry a glyph derived from the
+      // spec. A button with no <svg> at all means the icon layer threw and was
+      // swallowed; a console where they are ALL identical means the derivation
+      // stopped deriving and everything fell back to the generic shape.
+      const glyphs = [...document.querySelectorAll(
+        '#console [data-group="view"] .btn, #console [data-group="motion"] .btn')]
+        .map((b) => b.querySelector('svg')?.innerHTML ?? '');
+
       return {
         plate: document.getElementById('sheet').classList.contains('plate'),
+        glyphless: glyphs.filter((g) => !g).length,
+        distinctGlyphs: new Set(glyphs).size,
+        glyphButtons: glyphs.length,
         keyVisible: vis('#key'),
         instrVisible: vis('#instr'),
         dims: [...document.querySelectorAll('.dimlabel')].filter((t) => t.style.display !== 'none').length,
@@ -294,6 +305,15 @@ async function cmdSelftest() {
     }
     if (probe.minGap != null && probe.minGap < 24) {
       failures.push(`${where}: two balloons only ${probe.minGap.toFixed(0)}px apart (need >= 24)`);
+    }
+    if (probe.glyphless > 0) {
+      failures.push(`${where}: ${probe.glyphless} console button(s) drew no glyph`);
+    }
+    // Two buttons may legitimately share a glyph — two motions that both drive
+    // emitters do the same kind of thing. All of them sharing one does not
+    // happen by chance.
+    if (probe.glyphButtons > 2 && probe.distinctGlyphs < 2) {
+      failures.push(`${where}: all ${probe.glyphButtons} console glyphs are identical`);
     }
   }
 
@@ -333,7 +353,12 @@ async function cmdSelftest() {
           hasKey: Boolean(document.querySelector('#key .item')),
           hasConsole: Boolean(document.querySelector('#console .btn')),
           firstItem: text('#key .item .tx'),
-          firstView: text('#console .ctrlRow .btn'),
+          // Addressed by GROUP, not by document order. The console has grown
+          // rows since — layers, panels — and "the first button in the console"
+          // quietly stopped meaning "a view button" the moment one of them was
+          // appended first. It still had a label, so nothing failed; the probe
+          // was simply no longer measuring what it is named after.
+          firstView: text('#console [data-group="view"] .btn'),
         };
       }, code);
       // The same 90 frames the view loop waits for: the balloon layout glides

@@ -119,6 +119,12 @@ jobs:
       - name: The annotation layer holds still while the picture moves
         run: node dev/smoothness.mjs out/mbt-mk6/index.html
 
+      # A touchscreen is the one input nobody here has while reviewing, and the
+      # way it breaks is silent: a wrong `touch-action` leaves the desk working
+      # perfectly and pinch doing nothing.
+      - name: Touch gestures, on a phone-sized viewport
+        run: node dev/touch-check.mjs out/mbt-mk6/index.html
+
       - uses: actions/upload-artifact@v7
         if: always()
         with:

@@ -8,7 +8,9 @@
 {{FONT}}
 </head>
 <body>
-<div id="sheet">
+<!-- `data-chrome` picks the layout; the stylesheet carries three while the
+     direction is being chosen. See templates/styles.css, "LAYOUTS". -->
+<div id="sheet" data-chrome="{{CHROME}}">
   <canvas id="stage"></canvas>
   <svg id="ann" xmlns="http://www.w3.org/2000/svg"></svg>
 </div>

@@ -227,6 +227,56 @@ dimension appears only in the views where it reads: length on side/plan, height
 on side/front, width on front/plan, derived automatically from the axis it
 measures.
 
+## The console, and what it can put away
+
+The console is **glyphs, and the glyphs are derived** — nothing in `src/` holds
+a table of one subject's vocabulary, so nothing there can hold an icon for
+`SKIRTS` either.
+
+A **view's** glyph is the subject's own bounding box drawn from that viewpoint,
+through the same az/el basis the camera uses. A long hull gives a wide rectangle
+on SIDE and a narrow one on FRONT because that is what it is; an orthographic
+view picks up the dash-dot datum lines a plate carries, and a cut view picks up
+a cutting-plane trace. Any view an author invents gets a truthful glyph for free.
+
+A **motion's** glyph is the animation channel its drivers actually move, found
+by following `motion.set` into the `channel.bind` expressions — so `EXPLODE`
+separates, `DRIVE` rotates and `FIRE` throws particles without anyone writing
+that down. Proportions are compressed by a square root before drawing: a glyph
+is a symbol of the subject, and a true 4.2:1 hull inside 24px is a sliver.
+
+`view.icon` / `motion.icon` override the derivation. Neither example uses them,
+which is the point — if the shipped specs needed them, the derivation would not
+work.
+
+**Two overlays can be switched off.** Item numbering and the dimension run are
+each a button: a sheet carrying sixteen balloons and a full set of figures is
+correct, and also in the way while you are turning the thing over to look at its
+shape. Dimensions start on — a plate without one is not a plate, and the quality
+gate says so.
+
+**The three panels fold**, each to the handle in its own corner, and they step
+aside on their own while the picture is moving — off the same clock that fades
+the annotation layer, so the panels and the balloons leave and return together
+rather than on two timers that nearly agree.
+
+On a phone every panel starts folded and opens as the reading surface; the
+console becomes one strip along the bottom edge with the name under each glyph,
+because nothing hovers there and an unlabelled icon is a guess. One finger
+orbits, two pinch, a tap names a part and keeps naming it until you tap
+somewhere else.
+
+Three layouts ship while the direction is being chosen — `a` keeps the sheet and
+lets it yield, `b` racks the handles on the left edge, `c` shows nothing but the
+drawing — selected by `data-chrome` on `#sheet` and compared side by side on a
+real built page:
+
+```bash
+node bin/b2d.mjs serve
+```
+
+then open `http://localhost:5178/dev/chrome-lab.html`.
+
 ## Two languages, two standards
 
 A spec can carry its own translations. The page then grows a **LANG** row on
@@ -342,8 +392,9 @@ src/ingest/           archetypes, evidence scoring, research, prompt, credential
 src/emit/             esbuild bundle -> single inlined HTML
 templates/            page shell + stylesheet
 examples/             mbt-mk6 (reference parity), radial-engine (generality), smoke (engine test)
-dev/                  hatch-lab shader harness, headless screenshot, smoothness + anchor +
-                      explode probes, offline evidence + research checks, static server
+dev/                  hatch-lab shader harness, chrome-lab layout harness, headless screenshot,
+                      smoothness + anchor + explode + touch probes, offline evidence +
+                      research checks, static server
 ```
 
 Every probe asserts and exits non-zero on a violation, so each one actually

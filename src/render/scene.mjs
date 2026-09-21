@@ -261,11 +261,32 @@ const SECTION_NORMAL = {
   zx: new THREE.Vector3(0, 1, 0),
 };
 
+/**
+ * How many device pixels to draw per CSS pixel.
+ *
+ * A phone reports a device pixel ratio of 3 and hands you a viewport of about
+ * 390x844. Honouring it in full means shading 3 megapixels of hatched surface
+ * per frame on the weakest GPU that will ever open this sheet, and the hatch is
+ * a fragment shader — it is exactly the workload that does not survive it. The
+ * drawing does not get better above roughly 1.7x here either: the strokes are
+ * already sub-pixel.
+ *
+ * So the cap follows the viewport rather than the panel. A desktop display
+ * keeps the full 2x it has always had.
+ */
+function pixelRatio() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = window.innerWidth || 1920;
+  if (w < 560) return Math.min(dpr, 1.6);
+  if (w < 900) return Math.min(dpr, 1.85);
+  return Math.min(dpr, 2);
+}
+
 /* --------------------------------------------------------------------- stage */
 
 export function createStage(canvas, spec, shared) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(pixelRatio());
   renderer.setClearColor(new THREE.Color(PALETTE.paper), 1);
   renderer.localClippingEnabled = true;
   renderer.sortObjects = true;
@@ -340,13 +361,17 @@ export function createStage(canvas, spec, shared) {
     },
 
     resize(w, h) {
+      const dpr = pixelRatio();
       renderer.setSize(w, h, false);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setPixelRatio(dpr);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      shared.uDpr.value = Math.min(window.devicePixelRatio || 1, 2);
+      // The hatch shader rules its line pitch in device pixels, so it has to be
+      // told the same number the renderer is using or the hatching changes
+      // spacing the moment the cap bites.
+      shared.uDpr.value = dpr;
     },
   };
 }
 
-export { convexHull2, SECTION_NORMAL };
+export { convexHull2, SECTION_NORMAL, pixelRatio };

@@ -459,6 +459,11 @@
       "properties": {
         "id":     { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$" },
         "label":  { "type": "string", "maxLength": 8, "description": "console button text" },
+        "icon":   { "enum": ["spin", "oscillate", "reciprocate", "articulate", "pathFollow", "impulse",
+                            "visibility", "explode", "emit", "flow",
+                            "key", "instruments", "titleBlock", "callouts",
+                            "dimensions", "focus", "close", "help"],
+                    "description": "Optional console glyph. Omit it: a view's glyph is drawn from its own az/el/projection/section, so it describes the real viewpoint and any authored view gets one for free. Set it only to override that." },
         "caption":{ "type": "string", "description": "centred caption, e.g. 'SIDE ELEVATION'" },
         "sub":    { "type": "string", "description": "caption subline" },
         "projection": { "enum": ["perspective", "orthographic"], "default": "perspective" },
@@ -496,6 +501,11 @@
       "properties": {
         "id":    { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$" },
         "label": { "type": "string", "maxLength": 8 },
+        "icon":  { "enum": ["spin", "oscillate", "reciprocate", "articulate", "pathFollow", "impulse",
+                            "visibility", "explode", "emit", "flow",
+                            "key", "instruments", "titleBlock", "callouts",
+                            "dimensions", "focus", "close", "help"],
+                   "description": "Optional console glyph. Omit it: a motion's glyph is derived from the channel type its drivers actually move, so it describes what the motion does rather than what it is called. Set it only to override that." },
         "set":   { "type": "object", "minProperties": 1,
                    "additionalProperties": { "type": "number" },
                    "description": "driver id -> target value while this motion is active" },
