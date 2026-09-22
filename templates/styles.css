@@ -922,7 +922,13 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
     transform: translateY(6px);
     /* A part may carry a long note, and this card cannot be scrolled — it is
        `pointer-events: none` so a finger would scroll the model behind it. Four
-       lines is what a caption is for; the legend is where the full text lives. */
+       lines is what a caption is for; the legend is where the full text lives.
+
+       `vh` first: a browser that does not know `dvh` drops the whole
+       declaration rather than falling back within it, and this page is emitted
+       to be opened anywhere, including off a file:// path on whatever is
+       installed. The pair costs one line and the cap is never simply absent. */
+    max-height: 34vh;
     max-height: 34dvh;
     overflow: hidden;
   }
