@@ -64,6 +64,26 @@ const touch = (type, pts = []) => cdp.send('Input.dispatchTouchEvent', {
 });
 const settle = (ms = 260) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Wait for the page to actually PAINT, not for a stopwatch.
+ *
+ * The two things a tap changes are written at different moments: the legend
+ * highlight lands synchronously inside `onHover`, while the card that names the
+ * part is drawn by the main loop on its next frame. Read in between and you see
+ * a card from the previous tap over a legend that has already moved on.
+ *
+ * Sleeping long enough is not a fix, it is the same race with better odds —
+ * and the odds are worst exactly where it matters, since headless Chrome
+ * throttles rAF hard and its software renderer is slower again. Two frames is
+ * the actual condition.
+ */
+const painted = (p = page) => p.evaluate(() => new Promise((r) => {
+  // Raced against a timer so a page that stops painting fails an assertion
+  // instead of hanging the job until the runner's timeout.
+  const done = setTimeout(r, 2000);
+  requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(done); r(); }));
+}));
+
 const read = () => page.evaluate(() => ({
   az: +window.__B2D__.viewCtl.state.az.toFixed(2),
   zoom: +window.__B2D__.viewCtl.state.zoom.toFixed(3),
@@ -131,7 +151,9 @@ for (let y = 380; y <= 500 && !anchoredHit; y += 20) {
   for (let x = 120; x <= 280; x += 20) {
     await touch('touchStart', [[x, y]]);
     await touch('touchEnd');
-    await settle(150);
+    // Frames, not milliseconds — the card and the legend are written by
+    // different clocks and only a painted frame has them agreeing.
+    await painted();
     const s = await read();
     if (!s.card) continue;
     hit ??= { x, y, ...s };
@@ -152,7 +174,7 @@ if (hit) {
 
   await touch('touchStart', [[12, 300]]);
   await touch('touchEnd');
-  await settle(300);
+  await painted();
   ok(!(await read()).card, 'a tap on bare paper clears it');
 }
 
@@ -267,7 +289,9 @@ console.log('\na narrow window with a mouse — where the two layout opinions me
   for (let y = 330; y < 620 && !card; y += 22) {
     for (let x = 110; x < 290; x += 26) {
       await narrow.mouse.move(x, y);
-      await new Promise((r) => setTimeout(r, 70));
+      // Same reason as the tap sweep above: the card is drawn by the main loop,
+      // so a frame has to have gone by before there is anything to measure.
+      await painted(narrow);
       card = await narrow.evaluate(() => {
         const c = document.getElementById('hoverCard');
         if (!c.classList.contains('show')) return null;
