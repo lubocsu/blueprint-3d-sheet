@@ -20,7 +20,7 @@ import addFormats from 'ajv-formats';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { compileExpr, ExprError } from './expr.mjs';
-import { normalizeSpec } from './normalize.mjs';
+import { driverDefaults, normalizeSpec } from './normalize.mjs';
 import { localizableSlots, CHROME, BASE_LOCALE } from './i18n.mjs';
 
 const schema = JSON.parse(
@@ -127,8 +127,12 @@ function semanticCheck(spec, { strict = false } = {}) {
   const dupDrivers = drivers.map((d) => d.id).filter((id, i, a) => a.indexOf(id) !== i);
   for (const id of new Set(dupDrivers)) errors.push(`/drivers duplicate driver id "${id}"`);
   for (const [i, d] of drivers.entries()) {
-    const min = d.min ?? 0, max = d.max ?? 1, init = d.init ?? 0;
-    if (min >= max) errors.push(`/drivers/${i} ("${d.id}") min ${min} must be < max ${max}`);
+    const { min, max, init } = driverDefaults(d);
+    if (min >= max) {
+      // Checking init against a range that makes no sense only adds noise.
+      errors.push(`/drivers/${i} ("${d.id}") min ${min} must be < max ${max}`);
+      continue;
+    }
     if (init < min || init > max) errors.push(`/drivers/${i} ("${d.id}") init ${init} outside [${min}, ${max}]`);
   }
 
