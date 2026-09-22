@@ -258,6 +258,30 @@ if (hit) {
   ok((await readPick()).card, 'the card stays up with no finger on the glass');
 
   ok(!(await tap(BARE.x, BARE.y, false)).card, 'a tap on bare paper clears it');
+
+  /*
+     A press that stays put is a tap however long it is held.
+
+     There used to be a 400ms limit here, on the theory that a longer press was
+     a drag that happened to end where it began — but `moved` is a path length,
+     so such a drag already fails on the distance it covered and the limit was
+     only discarding slow deliberate taps. On a phone that is a page ignoring
+     you; and it is what made every tap vanish on CI, where the round trip
+     between the two dispatched events is itself longer than the limit.
+  */
+  const slow = await (async () => {
+    await tap(BARE.x, BARE.y, false);
+    await pickCdp.send('Input.dispatchTouchEvent',
+      { type: 'touchStart', touchPoints: [{ x: hit.x, y: hit.y, id: 1 }] });
+    await settle(900);
+    await pickCdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    const until = Date.now() + 4000;
+    let s = await readPick();
+    while (!s.card && Date.now() < until) { await settle(120); s = await readPick(); }
+    return s;
+  })();
+  ok(slow.card, 'a press held still for nearly a second is still a tap',
+    slow.card ? `named "${slow.part}"` : 'discarded');
 }
 
 ok(pickErrors.length === 0, 'nothing threw while picking', pickErrors.slice(0, 2).join(' | '));

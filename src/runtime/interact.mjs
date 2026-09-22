@@ -23,11 +23,19 @@
 
 import * as THREE from 'three';
 
-/** How far a press may wander and still count as a tap, by pointer kind. */
+/**
+ * How far a press may wander and still count as a tap, by pointer kind.
+ *
+ * `moved` is a PATH LENGTH, not a displacement — every move event adds its own
+ * |dx| + |dy| — so a press that wanders off and comes back fails this on the
+ * distance it covered. That is worth knowing because it removes the need for a
+ * duration limit as well: there was one here, and all it did was discard a slow
+ * deliberate tap, which on a touchscreen is a page that ignores you. A press
+ * that stays put is a tap however long it is held; nothing on this sheet does
+ * anything else with a long press.
+ */
 const SLOP_FINE = 4;
 const SLOP_COARSE = 10;
-/** A press held longer than this is a drag that happened to end where it began. */
-const TAP_MS = 400;
 
 export function createInteraction(canvas, camera, viewCtl, pickables, handlers = {}) {
   const raycaster = new THREE.Raycaster();
@@ -39,7 +47,6 @@ export function createInteraction(canvas, camera, viewCtl, pickables, handlers =
   let dragging = false;
   let lastX = 0, lastY = 0;
   let moved = 0;
-  let pressedAt = 0;
   let hovered = null;
   let pointerInside = false;
   /** 'mouse' hovers, 'touch' and 'pen' tap. Whichever spoke last wins. */
@@ -98,7 +105,6 @@ export function createInteraction(canvas, camera, viewCtl, pickables, handlers =
     if (down.size === 1) {
       dragging = true;
       moved = 0;
-      pressedAt = e.timeStamp;
       lastX = e.clientX;
       lastY = e.clientY;
       canvas.style.cursor = 'grabbing';
@@ -159,8 +165,7 @@ export function createInteraction(canvas, camera, viewCtl, pickables, handlers =
     try { canvas.releasePointerCapture?.(e.pointerId); } catch { /* already gone */ }
 
     const slop = isFine() ? SLOP_FINE : SLOP_COARSE;
-    const tapped = wasSingle && dragging
-      && moved < slop && (e.timeStamp - pressedAt) < TAP_MS;
+    const tapped = wasSingle && dragging && moved < slop;
 
     if (tapped) {
       const id = pickAt(e.clientX, e.clientY);
@@ -179,7 +184,6 @@ export function createInteraction(canvas, camera, viewCtl, pickables, handlers =
       lastX = only.x;
       lastY = only.y;
       moved = slop;            // this is the tail of a gesture, not a new tap
-      pressedAt = -Infinity;
       dragging = true;
       pinchDist = 0;
     } else {
