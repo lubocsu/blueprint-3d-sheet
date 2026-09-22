@@ -21,7 +21,7 @@ const TYPES = {
   '.woff2': 'font/woff2',
 };
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
     let rel = decodeURIComponent(url.pathname);
@@ -40,4 +40,29 @@ createServer(async (req, res) => {
   } catch (err) {
     res.writeHead(500).end(String(err));
   }
-}).listen(PORT, () => console.log(`serving ${ROOT} on http://localhost:${PORT}`));
+});
+
+/*
+   Several sessions work on this repository at once, each in its own worktree,
+   and they all reach for the same default port. Whoever gets there second used
+   to die on an unhandled `EADDRINUSE` stack trace — and the confusing part is
+   what happens next: the URL still WORKS, because the first server is still
+   answering it, from a different worktree. You then spend a while wondering why
+   your new file 404s and your changes are not in the page.
+*/
+server.on('error', (err) => {
+  if (err.code !== 'EADDRINUSE') throw err;
+  console.error([
+    `port ${PORT} is already in use.`,
+    '',
+    'Another session is probably serving a different worktree on it. That server will',
+    'answer your requests with ITS files, so pages load, your new files 404, and your',
+    'changes are simply missing from the page.',
+    '',
+    `  node bin/b2d.mjs serve --port ${PORT + 1}`,
+    '',
+  ].join('\n'));
+  process.exit(1);
+});
+
+server.listen(PORT, () => console.log(`serving ${ROOT} on http://localhost:${PORT}`));

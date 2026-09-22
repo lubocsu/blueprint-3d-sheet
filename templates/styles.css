@@ -1,4 +1,23 @@
-/* Drafting sheet chrome. Colours sampled from the reference film at native res. */
+/* Drafting sheet chrome. Colours sampled from the reference film at native res.
+
+   THE SHEET IS A STATE, AND THIS FILE IS WHERE IT BECOMES A LAYOUT.
+
+   `render/chrome.mjs` writes what is true — which panels are open, which
+   overlays are on, whether the picture is moving — onto `#sheet` as data
+   attributes, and never positions anything. Everything about where things go,
+   and what "open" even looks like at a given width, is decided here.
+
+   Two consequences worth knowing before editing:
+
+   - The OPENING state of each panel is declared here too, as `--panel-key`,
+     `--panel-instr`, `--panel-tb`. `chrome.mjs` reads those back and applies
+     them, including again after a resize crosses a breakpoint. So changing
+     which panels a layout starts with is a one-line change in this file.
+
+   - `dev/chrome-lab.html` renders a real built page at each breakpoint, in both
+     languages, with the views and motions drivable — which is where any change
+     in here should be looked at before it ships.
+*/
 
 :root {
   --paper:      #eaeef2;
@@ -30,6 +49,47 @@
   --fs-small: clamp(9.5px, 0.72vw, 12px);
   --fs-body:  clamp(10px, 0.78vw, 13px);
   --fs-title: clamp(13px, 1.05vw, 18px);
+
+  /* Glyph size and the square a console button occupies. A finger needs the
+     larger one; these are raised at the touch breakpoints rather than here, so
+     a desk keeps the drawing-instrument scale it has always had. */
+  --ic: 17px;
+  --hit: 30px;
+
+  /*
+     Whether an open panel sits BESIDE the drawing or ON TOP of it.
+
+     A width question, so it is answered here, and read back by `chrome.mjs` the
+     same way the opening states are — the runtime needs the answer because an
+     overlay changes what the annotation layer should even attempt. See the
+     phone breakpoint.
+  */
+  --panel-overlay: no;
+
+  /*
+     Whether the hover card FOLLOWS the pointer or is DOCKED to an edge.
+
+     Also a width question, and also read back by `chrome.mjs`, for a sharper
+     reason than the one above: a docked card is placed by `bottom` here, and a
+     followed card is placed by `top` from there. A `position: fixed` box given
+     both, with no height of its own, stretches to span them — so the card that
+     should have named one part filled half the screen. The two must not be able
+     to disagree, so there is one declaration and the runtime reads it.
+  */
+  --card-docked: no;
+
+  /*
+     Whether the item numbering is drawn before anyone asks.
+
+     On is right wherever there is room for the gutters, which is the whole
+     point of a numbered drawing. On a phone held upright the gutters are a
+     fifth of a narrow screen and the drawing pays for them — so there it starts
+     off, the framing takes the margin back, and the toolbar's numbering button
+     puts it right back. Read by `chrome.mjs` like the two above.
+  */
+  --layer-callouts: on;
+
+  --ease: cubic-bezier(.4, 0, .2, 1);
 }
 
 * { box-sizing: border-box; }
@@ -46,7 +106,15 @@ html, body {
 
 #sheet { position: fixed; inset: 0; }
 
-#stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#stage {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  /* The browser would otherwise claim a two-finger gesture for a page zoom and
+     fire `pointercancel` at the runtime mid-pinch. There is nothing on this
+     page to pan or zoom except the model, so it takes every gesture. */
+  touch-action: none;
+}
 
 #ann {
   position: absolute; inset: 0;
@@ -105,6 +173,7 @@ html, body {
   position: absolute;
   right: calc(var(--pad) * 1.9); top: calc(var(--pad) * 1.5);
   text-align: right;
+  max-width: 46vw;
 }
 .docTitle .t {
   font-size: var(--fs-title); font-weight: 700;
@@ -122,16 +191,78 @@ html, body {
   background: color-mix(in srgb, var(--panel) 93%, transparent);
   border: 1.4px solid var(--rule);
   backdrop-filter: blur(1px);
+  transition: opacity .22s var(--ease), transform .22s var(--ease),
+              visibility .22s, width .22s var(--ease);
 }
 .panel > h2 {
   margin: 0;
-  padding: 7px 12px 6px;
+  padding: 5px 12px 4px 5px;
   font-size: var(--fs-small);
   font-weight: 700;
   letter-spacing: .24em;
   text-transform: uppercase;
   background: var(--panel-head);
   border-bottom: 1.4px solid var(--rule);
+  display: flex; align-items: center; gap: 7px;
+}
+
+/* The handle on a panel's own header. Square, ink-ruled, the same object as a
+   console button — because when the panel is folded away that is exactly what
+   it becomes. */
+.panelToggle {
+  flex: none;
+  width: var(--hit); height: var(--hit);
+  display: grid; place-items: center;
+  padding: 0; margin: 0;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.panelToggle:hover { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+.panelToggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ic { width: var(--ic); height: var(--ic); display: block; }
+
+/* ------------------------------------------------------------- panel, folded */
+
+/*
+   A shut panel is not hidden — it is the same panel reduced to its handle, and
+   it stays exactly where it was, so opening it again does not make anything
+   else on the sheet move. The heading text stays in the document: it is what a
+   screen reader announces for the handle, and what the quality gate reads back
+   to prove the language switch reached this panel.
+*/
+#sheet[data-panel-key="shut"]   #key,
+#sheet[data-panel-instr="shut"] #instr,
+#sheet[data-panel-tb="shut"]    #titleblock {
+  width: auto;
+  min-width: 0;
+  background: none;
+  border: 0;
+  backdrop-filter: none;
+}
+#sheet[data-panel-key="shut"]   #key > h2,
+#sheet[data-panel-instr="shut"] #instr > h2,
+#sheet[data-panel-tb="shut"]    #titleblock > h2 {
+  padding: 0;
+  background: var(--paper-hi);
+  border: 1.2px solid var(--ink);
+}
+#sheet[data-panel-key="shut"]   #key > h2 .h2Text,
+#sheet[data-panel-instr="shut"] #instr > h2 .h2Text,
+#sheet[data-panel-tb="shut"]    #titleblock > h2 .h2Text,
+#sheet[data-panel-key="shut"]   #key > .panelBody,
+#sheet[data-panel-instr="shut"] #instr > .panelBody,
+#sheet[data-panel-tb="shut"]    #titleblock > .panelBody {
+  /* `clip` rather than `display: none`: the text has to stay measurable to
+     assistive technology, and it costs nothing to keep it. */
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* key to items ------------------------------------------------------------- */
@@ -214,6 +345,13 @@ html, body {
   bottom: calc(var(--pad) * 1.7);
   width: clamp(330px, 30vw, 530px);
 }
+/*
+   A drawing's title block has never had a heading over it — the cells name
+   themselves. It gets one here only so it can be folded away like the other
+   two, and the layouts that keep it open on a wide screen hide the header
+   again. See the variant blocks at the foot of this file.
+*/
+#titleblock > h2 { border-bottom: 1.4px solid var(--rule); }
 #titleblock .tb-org {
   padding: 6px 12px 7px;
   border-bottom: 1px solid #aeb9c9;
@@ -268,11 +406,12 @@ html, body {
   bottom: calc(var(--pad) * 1.7);
   background: color-mix(in srgb, var(--panel) 93%, transparent);
   border: 1.4px solid var(--rule);
-  padding: 8px 10px;
+  padding: 7px 9px;
   display: grid;
-  gap: 6px;
+  gap: 5px;
+  max-width: calc(100vw - var(--pad) * 3.8);
 }
-.ctrlRow { display: flex; align-items: center; gap: 6px; }
+.ctrlRow { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .ctrlRow > .rowLabel {
   width: 52px; flex: none;
   font-size: var(--fs-micro);
@@ -280,6 +419,19 @@ html, body {
   color: var(--label);
   text-transform: uppercase;
 }
+
+/*
+   A console button.
+
+   Square and ink-ruled, in the sheet's own weights — the reference for this is
+   a rack of drawing instruments, not a floating pill bar, and a rounded glass
+   toolbar would be a second design language arguing with the frame around it.
+
+   The word stays in the document at every width. On a desk it is hidden and a
+   tooltip carries it, because a mouse can hover and the glyph alone keeps the
+   toolbar compact. On a touchscreen nothing hovers, so the word comes back
+   under the icon — an unlabelled icon there is a guess, not a control.
+*/
 .btn {
   font: inherit;
   font-size: var(--fs-small);
@@ -288,14 +440,66 @@ html, body {
   color: var(--ink);
   background: var(--paper-hi);
   border: 1.2px solid var(--ink);
-  padding: 5px 11px;
-  min-width: 62px;
+  padding: 0;
+  min-width: var(--hit);
+  height: var(--hit);
+  display: inline-grid;
+  place-items: center;
   cursor: pointer;
+  position: relative;
   transition: background .12s, color .12s;
+}
+.btn > .ic { pointer-events: none; }
+.btn .btnLabel {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .btn:hover { background: #dde5ee; }
 .btn.on { background: var(--active); color: #f2f6fb; border-color: var(--active); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* A language button has no glyph: the endonym IS the glyph. */
+.btn.lang {
+  text-transform: none; letter-spacing: .06em;
+  min-width: 44px; padding: 0 8px;
+}
+
+/* tooltips ----------------------------------------------------------------- */
+
+/*
+   Hover-capable pointers only. On a phone the toolbar scrolls sideways inside
+   its own box, which would clip a bubble anchored to a button — and there is
+   nothing to hover with anyway. That is exactly the case where the label under
+   the icon is showing instead.
+*/
+@media (hover: hover) and (pointer: fine) {
+  .btn[data-tip]::after,
+  .panelToggle[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 50%; bottom: calc(100% + 7px);
+    transform: translateX(-50%);
+    padding: 4px 8px 5px;
+    background: var(--ink);
+    color: var(--paper-hi);
+    font-size: var(--fs-micro);
+    letter-spacing: .1em;
+    text-transform: none;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .12s .35s;
+    z-index: 9;
+  }
+  .btn[data-tip]:hover::after,
+  .btn[data-tip]:focus-visible::after,
+  .panelToggle[data-tip]:hover::after,
+  .panelToggle[data-tip]:focus-visible::after { opacity: 1; }
+}
 
 /* captions ----------------------------------------------------------------- */
 
@@ -325,16 +529,6 @@ html, body {
   color: var(--label); margin-top: 5px;
 }
 
-/* Plate mode: an orthographic elevation gets the sheet to itself. */
-#key, #instr {
-  transition: opacity .25s ease, visibility .25s;
-}
-#sheet.plate #key,
-#sheet.plate #instr {
-  opacity: 0;
-  visibility: hidden;
-}
-
 #hint {
   position: absolute;
   left: 50%; bottom: calc(var(--pad) * 1.1);
@@ -344,7 +538,41 @@ html, body {
   color: #a6b2c4;
   text-transform: uppercase;
   pointer-events: none;
+  white-space: nowrap;
 }
+
+/* ------------------------------------------------------- stepping aside */
+
+#key, #instr, #titleblock {
+  transition: opacity .25s ease, visibility .25s, transform .25s var(--ease);
+}
+
+/* Plate mode: an orthographic elevation gets the sheet to itself.
+   This sits ON TOP of whatever the reader chose — a plate is a plate even if
+   the legend was pinned open a moment earlier — so it is written as its own
+   rule rather than folded into the open/shut states above. */
+#sheet.plate #key,
+#sheet.plate #instr {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/*
+   The picture is being turned over. Everything that is text sitting on top of
+   the drawing leaves for as long as that lasts, and comes back the moment it
+   stops — the console does not, because it is what the reader's hand is on.
+
+   `.busy` is raised off the annotation layer's own fade, so the panels and the
+   balloons go and return together rather than on two clocks that nearly agree.
+*/
+#sheet.busy #key,
+#sheet.busy #instr,
+#sheet.busy #titleblock {
+  opacity: 0;
+  visibility: hidden;
+  transition-duration: .16s;
+}
+#sheet.busy #viewCaption { opacity: 0; }
 
 /* hover card --------------------------------------------------------------- */
 
@@ -447,12 +675,311 @@ html[lang^="zh"] .brand .division,
 html[lang^="zh"] .docTitle .s,
 html[lang^="zh"] #viewCaption .s { letter-spacing: .04em; }
 html[lang^="zh"] #key .tx { line-height: 1.4; }
+html[lang^="zh"] .btn[data-tip]::after,
+html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
 
-/* A language button reads in its own language whatever the sheet is set to. */
-.btn.lang { text-transform: none; letter-spacing: .06em; min-width: 52px; }
+/* ======================================================================
+   LAYOUTS
 
-@media (max-width: 900px) {
-  #key { width: min(60vw, 300px); }
+   Three ways of fusing the same two ideas — keep the sheet and let it step
+   aside, or fold it away and call it back. They share every rule above and
+   differ only in where the console sits and which panels a width opens with.
+   ====================================================================== */
+
+/*
+   Nothing on the glass but the frame, the title, the drawing and the toolbar.
+   Every panel is one press away, and a phone and a desk get the same layout —
+   which is the whole argument for it. Two other arrangements were carried here
+   while the direction was being chosen; this is the one that was picked.
+*/
+
+#sheet {
+  --panel-key: shut; --panel-instr: shut; --panel-tb: shut;
+}
+
+/*
+   The toolbar is centred by AUTO MARGINS, not by a transform.
+
+   A transformed element becomes the containing block for any `position: fixed`
+   descendant, which silently re-anchors it to the toolbar instead of to the
+   window. That cost an afternoon when a panel rail was nested in here; auto
+   margins centre the box without creating the trap.
+*/
+#console {
+  left: 0; right: 0;
+  width: max-content;
+  max-width: calc(100vw - var(--pad) * 3.8);
+  margin-inline: auto;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 9px;
+}
+#console .ctrlRow + .ctrlRow {
+  border-left: 1px solid color-mix(in srgb, var(--ink) 32%, transparent);
+  padding-left: 9px;
+}
+/* The groups are told apart by the rules between them and by the glyphs
+   themselves; a word in front of each is a third way of saying it. */
+#console .rowLabel { display: none; }
+
+/* Every panel is reached from the toolbar here, the title block included, so
+   it carries a header like the other two. */
+#titleblock > h2 { display: flex; }
+
+/* ======================================================================
+   WIDTHS
+   ====================================================================== */
+
+/* --- tablet ---------------------------------------------------------------- */
+
+@media (max-width: 1199px) {
+  #key { width: min(42vw, 330px); }
   #key .items { grid-template-columns: 1fr; }
-  #instr { width: min(45vw, 240px); }
+  #instr { width: min(32vw, 260px); }
+  #titleblock { width: min(46vw, 400px); }
+  #titleblock .cells { grid-template-columns: repeat(2, 1fr); }
+  #titleblock .cell:nth-child(4n) { border-right: 1px solid #aeb9c9; }
+  #titleblock .cell:nth-child(2n) { border-right: 0; }
+  #titleblock .cell:nth-child(n+3) { border-top: 1px solid #aeb9c9; }
+
+}
+
+/* --- phone ----------------------------------------------------------------- */
+
+@media (max-width: 767px) {
+  :root {
+    --pad: 10px;
+    --ic: 19px;
+    --hit: 38px;
+    --fs-micro: 9px;
+    --fs-small: 10.5px;
+    --fs-body:  11.5px;
+    --fs-title: 12.5px;
+  }
+
+  /* Pure decoration, and at this width it is the only thing on the paper that
+     is not either the drawing or a control. */
+  .zone { display: none; }
+
+  /*
+     The heading is two facts fighting for one line: who issued the sheet, and
+     what it is of. At this width only one of them can be full size, and on a
+     drawing that is the subject — so the byline shrinks to the micro size and
+     is allowed to clip, and the title keeps the rest.
+  */
+  .brand {
+    left: var(--pad); top: var(--pad); gap: 6px;
+    max-width: 40%;
+  }
+  .brand .mark { width: 20px; height: 20px; }
+  .brand .division { display: none; }
+  .brand .sig {
+    font-size: var(--fs-micro);
+    letter-spacing: .02em;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .docTitle {
+    right: var(--pad); top: var(--pad);
+    max-width: calc(58% - var(--pad));
+  }
+  .docTitle .s { display: none; }
+  .docTitle .t {
+    letter-spacing: .06em;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  /* An open panel covers the drawing here rather than sitting beside it, and
+     the card that names a part docks to an edge instead of chasing a finger.
+     Both are read back by the runtime — see the declarations at the top, and
+     `--card-docked` in particular for what happens when they disagree. */
+  #sheet { --panel-overlay: yes; --card-docked: yes; }
+
+  /*
+     An open panel on a phone takes the paper.
+
+     Half-covering the drawing was the first attempt and it is the worst of
+     both: the model is behind the card exactly where it is centred, so what
+     shows above it is blank paper, and the numbering has nowhere to go and is
+     suppressed anyway. Since none of the drawing survives an open panel here,
+     the panel may as well be the reading surface — top to bottom between the
+     heading and the toolbar, both of which stay put so it is still obvious
+     which sheet this is and how to get back to it.
+  */
+  #sheet[data-panel-key="open"]   #key,
+  #sheet[data-panel-instr="open"] #instr,
+  #sheet[data-panel-tb="open"]    #titleblock {
+    position: fixed;
+    left: var(--pad); right: var(--pad);
+    top: calc(var(--pad) * 4.6);
+    bottom: calc(var(--hit) + var(--pad) * 3.4);
+    width: auto;
+    max-height: none;
+    overflow: auto;
+    overscroll-behavior: contain;
+    /* Opaque, not the 93% the docked panels use. A panel this size is being
+       READ, and the model showing faintly through forty lines of legend is
+       texture behind text, not context. */
+    background: var(--panel);
+    box-shadow: 0 10px 34px -12px color-mix(in srgb, var(--ink) 58%, transparent);
+    z-index: 6;
+  }
+  /* The other two handles stay reachable on top of it, so the panels read as
+     three tabs of one surface rather than three separate errands. */
+  #sheet[data-panel-key="shut"]   #key,
+  #sheet[data-panel-instr="shut"] #instr,
+  #sheet[data-panel-tb="shut"]    #titleblock { z-index: 7; }
+  #sheet[data-panel-key="open"] #key > h2,
+  #sheet[data-panel-instr="open"] #instr > h2,
+  #sheet[data-panel-tb="open"] #titleblock > h2 {
+    position: sticky; top: 0; z-index: 1;
+    display: flex;
+  }
+
+  /* Folded, they are handles parked in the corners they came from. */
+  #sheet[data-panel-key="shut"]   #key        { left: var(--pad); top: calc(var(--pad) * 4.6); }
+  #sheet[data-panel-instr="shut"] #instr      { right: var(--pad); top: calc(var(--pad) * 4.6); width: auto; }
+  #sheet[data-panel-tb="shut"]    #titleblock { right: var(--pad); top: calc(var(--pad) * 4.6 + var(--hit) + 6px); bottom: auto; width: auto; }
+
+  #key .items { padding: 8px 8px 8px 8px; }
+  #titleblock .cells { grid-template-columns: repeat(2, 1fr); }
+
+  /*
+     One strip along the bottom edge, scrolling sideways. Five stacked rows of
+     controls would take a quarter of the screen; a single strip takes one
+     button's worth and the groups stay in their drafting order, ruled apart.
+  */
+  #console {
+    left: var(--pad); right: var(--pad);
+    bottom: var(--pad);
+    max-width: none;
+    padding: 5px 6px;
+    display: flex;
+    grid-auto-flow: unset;
+    transform: none;
+    align-items: stretch;
+    gap: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  #console::-webkit-scrollbar { display: none; }
+  /* `flex: none` on both levels or there is no overflow to scroll: flex would
+     rather crush eleven buttons into the width it has than admit they do not
+     fit, and the strip silently becomes a pile. */
+  #console .ctrlRow { flex: none; gap: 4px; padding: 0 6px; }
+  #console .ctrlRow + .ctrlRow {
+    border-left: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  }
+  #console .rowLabel { display: none; }
+  #console .btn { flex: none; }
+
+  /* Nothing hovers here, so the name comes out from under the clip and sits
+     under its glyph. */
+  .btn {
+    height: auto;
+    min-width: calc(var(--hit) + 6px);
+    padding: 5px 4px 4px;
+    grid-auto-flow: row;
+    gap: 2px;
+  }
+  .btn .btnLabel {
+    position: static;
+    width: auto; height: auto;
+    margin: 0;
+    clip-path: none;
+    overflow: visible;
+    font-size: 8.5px;
+    letter-spacing: .04em;
+    line-height: 1;
+    /* Enough to tell RUN from DRIVE, not enough for one long name to push the
+       rest of the strip off the far end. The tooltip is gone here anyway — the
+       full name is in the panel this button opens. */
+    max-width: 6ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .btn.lang { min-width: 40px; padding: 5px 7px; }
+
+  /* Clear of the toolbar, both of them. */
+  #viewCaption { bottom: calc(var(--hit) + var(--pad) * 3.2); }
+  #hint { display: none; }
+
+  /*
+     The card cannot follow a finger — the finger is on top of it. It docks
+     above the toolbar instead, full width, where it is legible and is not
+     under the hand that summoned it.
+  */
+  #hoverCard {
+    position: fixed;
+    left: var(--pad); right: var(--pad);
+    bottom: calc(var(--hit) + var(--pad) * 3.4);
+    top: auto;
+    max-width: none;
+    transform: translateY(6px);
+    /* A part may carry a long note, and this card cannot be scrolled — it is
+       `pointer-events: none` so a finger would scroll the model behind it. Four
+       lines is what a caption is for; the legend is where the full text lives.
+
+       `vh` first: a browser that does not know `dvh` drops the whole
+       declaration rather than falling back within it, and this page is emitted
+       to be opened anywhere, including off a file:// path on whatever is
+       installed. The pair costs one line and the cap is never simply absent. */
+    max-height: 34vh;
+    max-height: 34dvh;
+    overflow: hidden;
+  }
+  #hoverCard .d {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
+  }
+  #hoverCard.show { transform: none; }
+}
+
+/*
+   The numbering starts off only on a narrow sheet held UPRIGHT.
+
+   That is where the argument holds: the gutters are horizontal, the width is
+   the scarce axis, and a fifth of it is being kept clear for balloons. Turn the
+   same phone on its side and there are 740px of width — the gutters cost the
+   same fraction of a much larger number, the balloons place perfectly well, and
+   there is nothing to buy by hiding them.
+*/
+@media (max-width: 767px) and (orientation: portrait) {
+  #sheet { --layer-callouts: off; }
+}
+
+/* --- phone, on its side ------------------------------------------------------
+   A short viewport is the case where the toolbar can eat the drawing. The
+   controls compress to glyphs again — a landscape phone is 360px tall and
+   cannot spare a second line of text under each one. */
+
+@media (max-height: 500px) and (orientation: landscape) {
+  :root { --hit: 30px; --ic: 16px; }
+  .btn { padding: 0; grid-auto-flow: column; }
+  .btn .btnLabel {
+    position: absolute;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .brand .sig, .docTitle .s { display: none; }
+  /* Landscape: the heading has already been trimmed, so the card may start
+     higher up. */
+  #sheet[data-panel-key="open"]   #key,
+  #sheet[data-panel-instr="open"] #instr,
+  #sheet[data-panel-tb="open"]    #titleblock { top: calc(var(--pad) * 3.2); }
+}
+
+/* Readers who have asked their system to stop moving things. The sheet still
+   steps aside — that is what it is for — it just does it at once. */
+@media (prefers-reduced-motion: reduce) {
+  .panel, #key, #instr, #titleblock, #hoverCard, #viewCaption,
+  .btn, .panelToggle { transition-duration: .01ms !important; }
 }

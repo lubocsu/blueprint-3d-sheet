@@ -65,6 +65,7 @@ export const CHROME = {
 
     'panel.key': 'Key to items',
     'panel.instruments': 'Instrumentation',
+    'panel.titleBlock': 'Title block',
     'key.projection': 'Projection',
     'key.units': 'Units',
     'key.tolerance': 'Tol.',
@@ -81,7 +82,15 @@ export const CHROME = {
     'row.view': 'View',
     'row.motion': 'Motion',
     'row.lang': 'Lang',
+    'row.panel': 'Panels',
+    'row.layer': 'Layers',
+    'row.focus': 'Focus',
+    'layer.callouts': 'Item numbers',
+    'layer.dimensions': 'Dimensions',
     'hint': 'Drag to orbit · Scroll to zoom',
+    // A finger cannot scroll and a mouse cannot pinch, so the sheet says
+    // whichever is true of the pointer actually in use.
+    'hint.touch': 'Drag to orbit · Pinch to zoom',
 
     'projection.FIRST ANGLE': 'FIRST ANGLE',
     'projection.THIRD ANGLE': 'THIRD ANGLE',
@@ -122,6 +131,9 @@ export const CHROME = {
     // key to items is called on a Chinese sheet, and the balloons are its 序号.
     'panel.key': '明细栏',
     'panel.instruments': '仪表读数',
+    // GB/T 10609.1 名为 标题栏，和 明细栏 成对——两者在一张 GB 图纸上是
+    // 相邻的两个栏，不是“标题块”这种转写。
+    'panel.titleBlock': '标题栏',
     'key.projection': '画法',
     // 计量单位, not the bare 单位 — on a GB sheet 单位 on its own reads as the
     // issuing organisation, which is a different cell in the title block.
@@ -143,7 +155,16 @@ export const CHROME = {
     'row.view': '视图',
     'row.motion': '动作',
     'row.lang': '语言',
+    'row.panel': '信息栏',
+    // 图层 是 CAD 中文里现成的词，读图的人不用学就懂它指什么。
+    'row.layer': '图层',
+    'row.focus': '专注',
+    // GB/T 10609.2 里气泡里的那个数字叫 序号，不叫 编号。
+    'layer.callouts': '序号标注',
+    // GB/T 4458.4 尺寸注法。
+    'layer.dimensions': '尺寸标注',
     'hint': '拖动旋转 · 滚轮缩放',
+    'hint.touch': '拖动旋转 · 双指缩放',
 
     // GB/T 14692 names the projection method 画法, not 投影.
     'projection.FIRST ANGLE': '第一角画法',

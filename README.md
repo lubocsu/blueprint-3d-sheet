@@ -227,6 +227,73 @@ dimension appears only in the views where it reads: length on side/plan, height
 on side/front, width on front/plan, derived automatically from the axis it
 measures.
 
+## The console, and what it can put away
+
+The console is **glyphs, and the glyphs are derived** — nothing in `src/` holds
+a table of one subject's vocabulary, so nothing there can hold an icon for
+`SKIRTS` either.
+
+A **view's** glyph is the subject's own bounding box drawn from that viewpoint,
+through the same az/el basis the camera uses. A long hull gives a wide rectangle
+on SIDE and a narrow one on FRONT because that is what it is; an orthographic
+view picks up the dash-dot datum lines a plate carries, and a cut view picks up
+a cutting-plane trace. Any view an author invents gets a truthful glyph for free.
+
+A **motion's** glyph is the animation channel its drivers actually move, found
+by following `motion.set` into the `channel.bind` expressions — so `EXPLODE`
+separates, `DRIVE` rotates and `FIRE` throws particles without anyone writing
+that down. Proportions are compressed by a square root before drawing: a glyph
+is a symbol of the subject, and a true 4.2:1 hull inside 24px is a sliver.
+
+`view.icon` / `motion.icon` override the derivation. Neither example uses them,
+which is the point — if the shipped specs needed them, the derivation would not
+work.
+
+**Two overlays can be switched off.** Item numbering and the dimension run are
+each a button: a sheet carrying sixteen balloons and a full set of figures is
+correct, and also in the way while you are turning the thing over to look at its
+shape. Dimensions start on — a plate without one is not a plate, and the quality
+gate says so.
+
+The framing follows. `0.78` — how much of the sheet the drawing fills — is not
+a taste, it is the width the balloon gutters occupy, so with the numbering off
+the drawing gets it back. On a narrow sheet held upright that is the difference
+between filling 79% of the width and 94% of it, which is why the numbering is
+the one thing that starts **off** there: the gutters are horizontal, the width
+is the only scarce axis on a phone, and a fifth of it was being held for
+balloons before anyone asked for them. One press puts them back, and the
+framing eases in behind them. A reader who presses it keeps that answer through
+every later resize — their choice outranks the layout's.
+
+**The three panels fold**, each to the handle in its own corner, and they step
+aside on their own while the picture is moving — off the same clock that fades
+the annotation layer, so the panels and the balloons leave and return together
+rather than on two timers that nearly agree.
+
+On a phone every panel starts folded and opens as the reading surface; the
+console becomes one strip along the bottom edge with the name under each glyph,
+because nothing hovers there and an unlabelled icon is a guess. One finger
+orbits, two pinch, a tap names a part and keeps naming it until you tap
+somewhere else.
+
+The sheet therefore **opens as a viewport**: the frame, the byline, the title,
+the drawing and the toolbar, with every panel one press away. A phone and a desk
+get the same arrangement, which is most of the argument for it.
+
+To look at any of this without owning a phone, `dev/chrome-lab.html` renders a
+real built page at each breakpoint, in both languages, with the views, motions,
+overlays and panels drivable from the side:
+
+```bash
+node bin/b2d.mjs build examples/mbt-mk6/spec.json --out out/mbt-mk6
+node bin/b2d.mjs serve
+```
+
+then open `http://localhost:5178/dev/chrome-lab.html`. If that port is taken —
+several worktrees, one default — the server now says so and hands you the next
+one, because the alternative was another worktree's server answering with its
+own files.
+
 ## Two languages, two standards
 
 A spec can carry its own translations. The page then grows a **LANG** row on
@@ -342,8 +409,9 @@ src/ingest/           archetypes, evidence scoring, research, prompt, credential
 src/emit/             esbuild bundle -> single inlined HTML
 templates/            page shell + stylesheet
 examples/             mbt-mk6 (reference parity), radial-engine (generality), smoke (engine test)
-dev/                  hatch-lab shader harness, headless screenshot, smoothness + anchor +
-                      explode probes, offline evidence + research checks, static server
+dev/                  hatch-lab shader harness, chrome-lab layout harness, headless screenshot,
+                      smoothness + anchor + explode + touch probes, offline evidence +
+                      research checks, static server
 ```
 
 Every probe asserts and exits non-zero on a violation, so each one actually

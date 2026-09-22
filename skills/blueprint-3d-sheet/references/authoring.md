@@ -242,11 +242,32 @@ be there.
 For a continuously accumulating angle, declare a driver with a very large `max`
 and let a motion push it there; the eased approach gives a smooth ramp.
 
+**Do not give a motion an `icon`.** The console works out its glyph by following
+`set` into the `channel.bind` expressions and taking the animation primitive
+those drivers actually move — so a motion that separates the assembly gets the
+separation glyph, and one that runs an emitter gets particles, with nothing
+written down. Writing `icon` overrides that, and an override is a claim about
+the motion that the geometry can then quietly stop agreeing with.
+
+It is worth knowing what happens when the derivation finds nothing: a motion
+that pushes a driver **no channel reads** has no glyph to earn, and gets the
+generic one. That is usually not an icon problem. It means the button does not
+move anything, which is worth checking before reaching for `icon` to cover it.
+
 ## Views, dimensions, callouts
 
 **Views**: at least three orthographic plates plus perspective views and one
 section. Orthographic views are reached by tweening the field of view down, so
 they transition smoothly rather than popping.
+
+A view's console glyph is drawn from its own `az`/`el`/`projection`/`section`
+against `bounds` — the subject's box seen from that viewpoint — so a view you
+invent is already described by its button and `view.icon` is not needed. The
+same applies as above: prefer leaving it off.
+
+`label` is capped at 8 characters and is what shows under the glyph on a
+touchscreen, where there is no hover and no tooltip. Keep it to something that
+survives being read at 8.5px: `SIDE`, `SEC A-A`, `3/4 R`.
 
 **Dimensions** are declared in world coordinates and rendered as real 3D
 geometry with arrowheads. The layer picks which dimensions belong on which view

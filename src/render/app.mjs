@@ -11,7 +11,7 @@ import { normalizeSpec } from '../spec/normalize.mjs';
 import { applyLocale, localeList } from '../spec/i18n.mjs';
 import { buildAssembly } from '../build/assembly.mjs';
 import { setLineResolution, lineMaterial, WEIGHTS } from '../build/edges.mjs';
-import { createStage } from './scene.mjs';
+import { createStage, pixelRatio } from './scene.mjs';
 import { makeHatchMaterial, makeSharedUniforms } from './hatch-material.mjs';
 import { PALETTE } from './materials.mjs';
 import { buildChrome } from './chrome.mjs';
@@ -61,7 +61,7 @@ const canvas = document.getElementById('stage');
 const svg = document.getElementById('ann');
 
 const shared = makeSharedUniforms({
-  dpr: Math.min(window.devicePixelRatio || 1, 2),
+  dpr: pixelRatio(),
   pitch: raw.style?.hatchPitch ?? 4.0,
   uniformHatch: (raw.style?.materialHatch ?? 'uniform') === 'uniform',
 });
@@ -141,6 +141,18 @@ for (const c of spec.annotations?.callouts ?? []) {
   if (!calloutByPart.has(c.anchor)) calloutByPart.set(c.anchor, c.n);
 }
 
+/**
+ * How much wider the drawing may be framed once the numbering is off.
+ *
+ * `DEFAULT_FIT` is 0.78 because the balloon gutters take the rest, so this is
+ * that margin handed back — but not all of it. The gutters are not the only
+ * thing the margin was doing: the sheet has a ruled frame a few pixels in from
+ * the edge, and a subject framed to the last percent puts its gun barrel two
+ * pixels off that line, which reads as a mistake rather than as a full page.
+ * 0.90 keeps a visible band of paper between the drawing and its own border.
+ */
+const NO_GUTTER_GAIN = 0.90 / 0.78;
+
 /* -------------------------------------------------------------------- chrome */
 
 /** Everything a view switch implies, in one place. */
@@ -194,7 +206,48 @@ const chrome = buildChrome(sheet, spec, {
     annotations.bump();
   },
   onLocale: setLocale,
+
+  /**
+   * An overlay came off or went back on.
+   *
+   * Both layers live in the annotation set, which is SOLVED rather than
+   * tracked, so the change has to go through the same activity clock as a view
+   * switch: fade out, re-solve, fade back. Dropping the numbering frees the
+   * gutters the balloons were using, and the dimensions that remain get to
+   * spread into them.
+   */
+  onLayer: (key, on) => {
+    if (key === 'callouts') syncCallouts();
+    if (key === 'dims') dimensions.setVisible(on);
+    annotations.bump();
+  },
+
+  /**
+   * A panel folded away or came back. The balloons are laid out around the
+   * panels, so the layout is now wrong and has to be re-solved — which is
+   * exactly what `bump` asks for, and `solve` re-measures the panels itself.
+   */
+  onPanel: () => { syncCallouts(); annotations.bump(); },
 });
+
+/**
+ * Whether the numbering is drawn, from the two things that can suppress it.
+ *
+ * The reader's switch is the obvious one. The other is a panel covering the
+ * drawing — on a phone an open legend is a card over the model, and the solver,
+ * asked to place sixteen balloons on the strip of paper that is left, will do
+ * exactly that: sixteen balloons crowded above the card with their leaders
+ * running down behind it to parts nobody can see. There is nothing to point at,
+ * so it points at nothing.
+ */
+function syncCallouts() {
+  const shown = chrome.layerOn('callouts') && !chrome.panelsOverlaying;
+  annotations.setCalloutsVisible(shown);
+  // The framing margin exists for the gutters. With no balloons to put in them
+  // the drawing may have it back — which is most visible on a phone, where the
+  // margin is a fifth of a narrow screen.
+  viewCtl.setFitGain(shown ? 1 : NO_GUTTER_GAIN);
+}
 
 const annotations = createAnnotations(svg, spec, {
   records, inner, camera: stage.camera, canvas, pickables, viewCtl, bbox,
@@ -276,6 +329,11 @@ function resize() {
   setEmitterResolution(w, h);
   explodeTrace?.setResolution(w, h);
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  // A width change can cross a breakpoint, and the stylesheet's opinion about
+  // which panels a layout opens with differs on either side of one. Panels the
+  // reader has decided about are left alone — see `applyPanelDefaults`.
+  chrome.applyPanelDefaults();
+  syncCallouts();
   annotations.refreshAvoid();
   annotations.bump();
 }
@@ -283,6 +341,14 @@ window.addEventListener('resize', resize);
 resize();
 
 /* ------------------------------------------------------------------ mainloop */
+
+/**
+ * How far the annotation layer has to have faded before the panels follow it
+ * out. Read off the same opacity, so one number decides how eager the sheet is
+ * to get out of the reader's way — low enough that a drag clears the glass
+ * almost at once, high enough that a stray wheel click does not flash them.
+ */
+const BUSY_AT = 0.72;
 
 let last = performance.now();
 let elapsed = 0;
@@ -313,6 +379,13 @@ function tick(now) {
 
   annotations.update(window.innerWidth, window.innerHeight, dt);
   dimensions.update(window.innerWidth, window.innerHeight, annotations.opacity);
+
+  // The panels step aside for exactly as long as the annotation layer does.
+  // Not a second clock: the annotation fade already means "the picture is
+  // moving", which is the same question the panels are asking, and two timers
+  // that nearly agree would show up as the panels and the balloons leaving at
+  // different moments.
+  chrome.setBusy(annotations.opacity < BUSY_AT);
   chrome.updateInstruments(scope);
   chrome.showCard(hoveredPart ? partById.get(hoveredPart) : null,
                   interaction.pointer.x, interaction.pointer.y);
@@ -340,6 +413,16 @@ window.__B2D__ = {
     return drivers.isActive(id);
   },
   clearMotions: () => { drivers.reset(); chrome.setActiveMotions([]); annotations.bump(); },
+  /** The annotation overlays and the information panels, driven as the console drives them. */
+  setLayer: (key, on) => {
+    // `byReader`, like `setPanel` below: this hook stands in for a press on the
+    // console, and a press is a decision the layout does not get to revise on
+    // the next resize.
+    chrome.setLayer(key, on, { byReader: true });
+    return chrome.layerOn(key);
+  },
+  layerOn: (key) => chrome.layerOn(key),
+  setPanel: (key, open) => chrome.setPanel(key, open, { byReader: true }),
   /** Language, driven exactly as the console button drives it. */
   locales: LOCALES.map((l) => l.code),
   get locale() { return locale; },

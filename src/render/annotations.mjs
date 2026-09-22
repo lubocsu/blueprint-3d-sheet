@@ -456,6 +456,16 @@ export function createAnnotations(svg, spec, ctx) {
    */
   let balloonsSuppressed = false;
 
+  /**
+   * The reader's own switch for the numbering.
+   *
+   * Separate from `balloonsSuppressed` because they answer different
+   * questions: that one is the VIEW's opinion (`view.callouts: false` asks for
+   * a bare plate), this one is the READER's. Either suppresses; neither
+   * overrules the other.
+   */
+  let calloutsEnabled = true;
+
   const _camPos = new THREE.Vector3();
   const _wp = new THREE.Vector3();
   const _wn = new THREE.Vector3();
@@ -532,6 +542,13 @@ export function createAnnotations(svg, spec, ctx) {
   };
 
   function solve(w, h) {
+    // The panels are no longer fixed furniture: a reader can fold any of them
+    // away and the layout is re-solved the moment they do. Measuring here
+    // rather than only on resize is what keeps `avoidRects` describing the
+    // sheet that is actually on screen — the alternative is a balloon routed
+    // around a panel that is not there, or parked on one that is.
+    refreshAvoid();
+
     const centre = project(_c.setFromMatrixPosition(inner.matrixWorld), w, h);
 
     let silh = null;
@@ -652,13 +669,27 @@ export function createAnnotations(svg, spec, ctx) {
     /** Something changed the picture: fade out, freeze, re-solve when quiet. */
     bump() { lastActivity = performance.now(); needsSolve = true; },
 
+    /**
+     * Show or hide the item numbering.
+     *
+     * Hides the balloon elements, NOT the SVG — the dimension labels live in
+     * the same layer, and folding this into the opacity would take them with
+     * it. That mistake has been made here before; the comment above
+     * `balloonsSuppressed` records what it cost.
+     */
+    setCalloutsVisible(on) {
+      if (calloutsEnabled === !!on) return;
+      calloutsEnabled = !!on;
+      needsSolve = true;
+    },
+
     get opacity() { return opacity; },
 
     update(w, h, dt = 1 / 60) {
       frame++;
 
       const view = ctx.viewCtl?.current ?? null;
-      balloonsSuppressed = view?.callouts === false;
+      balloonsSuppressed = view?.callouts === false || !calloutsEnabled;
 
       // A view tween counts as activity for as long as it runs.
       if (ctx.viewCtl?.tweening) lastActivity = performance.now();

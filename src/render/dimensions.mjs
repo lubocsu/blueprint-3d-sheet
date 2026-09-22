@@ -163,6 +163,9 @@ export function createDimensions({ parent, svg, spec, camera, viewCtl }) {
 
   const _v = new THREE.Vector3();
 
+  /** Reader's switch; see `setVisible`. */
+  let enabled = true;
+
   return {
     group, datumGroup,
 
@@ -178,6 +181,19 @@ export function createDimensions({ parent, svg, spec, camera, viewCtl }) {
 
     /** Datum centrelines only appear on the orthographic plates. */
     setDatumsVisible(on) { datumGroup.visible = !!on; },
+
+    /**
+     * The reader's switch for the whole dimension run.
+     *
+     * It starts on, and the quality gate insists on that: an orthographic
+     * plate carrying no dimension is not a plate. What this buys is the other
+     * direction — a reader studying the SHAPE of something can take the
+     * figures off it for a moment without leaving the view.
+     */
+    setVisible(on) {
+      enabled = !!on;
+      group.visible = enabled;
+    },
 
     /**
      * Re-read the dimension text. A language switch rewrites `d.label` in
@@ -203,7 +219,9 @@ export function createDimensions({ parent, svg, spec, camera, viewCtl }) {
       datumLine.material.opacity = 0.85 * opacity;
 
       for (const e of entries) {
-        const shown = (!e.spec.views?.length || e.spec.views.includes(viewId)) && opacity > 0.01;
+        const shown = enabled
+          && (!e.spec.views?.length || e.spec.views.includes(viewId))
+          && opacity > 0.01;
         e.line.material.opacity = opacity;
         e.line.visible = shown;
         if (!shown) { e.text.style.display = 'none'; continue; }
