@@ -42,6 +42,11 @@ jobs:
       - name: Instance placement patterns
         run: node dev/instances-check.mjs
 
+      # A driver a button pushes but nothing reads is a dead control on the
+      # published demo, and only this catches it.
+      - name: Driver read/write wiring
+        run: node dev/drivers-check.mjs
+
       - name: Bundle checks (local HTTP server, no external network)
         run: node dev/gather-check.mjs
 

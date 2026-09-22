@@ -10,6 +10,16 @@ arrays, one step vector per axis. Linear takes singular `count` and `step`.
 **`unknown identifier in bind`** — every name in an expression must be a driver
 you declared, or `t`, or `fps`. There is no implicit vocabulary.
 
+**`driver "x" is set by motion "y" but no channel or instrument reads it`** —
+the button is on the console and pressing it does nothing. Bind the driver into
+a channel expression or an instrument, or delete the driver and the motion. An
+error under `--strict`, because the reader of the sheet meets this one.
+
+**`driver "x" is read … but no motion or view sets it`** — the other half: the
+expression is wired but nothing can move the value, so it sits at `init` and the
+geometry never animates. Give it a motion, or a view `set`, or fold the constant
+into the expression and drop the driver.
+
 **Shape rejected with a wall of `oneOf` errors** — the validator re-checks
 against the branch matching your `shape.type` and reports that branch's errors
 specifically. Read the tail of the message, not the head.
