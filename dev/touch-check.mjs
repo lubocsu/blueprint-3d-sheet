@@ -126,57 +126,142 @@ console.log('\ngestures — a finger does what a mouse does, by different means'
 
 /* ------------------------------------------------------------ picking */
 
+/*
+ * A FRESH PAGE, and an AIMED tap.
+ *
+ * Two things were wrong with doing this on the page the gestures ran on.
+ *
+ * It inherited that page's state. The pinch left the zoom at 0.43 and a
+ * `touchEnd` carrying no points, and whether the runtime's pointer map came
+ * back empty from that is the browser's business, not something to assume — one
+ * stale entry and every later press is a second finger, so `dragging` is false
+ * and no tap is ever recognised. Compensating with a zoom reset papered over
+ * half of that. A new page has no state to inherit.
+ *
+ * And it aimed blind. A 63-point grid across the middle band, hoping something
+ * was under one of them — which depends on the subject's proportions, the
+ * framing, and how much of the sheet the drawing fills, all of which this
+ * branch changed. When it missed, the report was "nothing hit", which says
+ * nothing about why.
+ *
+ * Now the page is asked where the parts ARE: each callout's anchor part is
+ * projected to screen through the live camera, and those points are tapped. A
+ * miss now means the pick is broken, which is what this is supposed to detect.
+ */
 console.log('\npicking — the tap is the hover, and it stays put');
 
-await page.evaluate(() => {
-  window.__B2D__.setView('iso');
-  window.__B2D__.zoom(1 / window.__B2D__.viewCtl.state.zoom);
-});
-await settle(1400);
+const pick = await browser.newPage();
+const pickErrors = [];
+pick.on('pageerror', (e) => pickErrors.push(String(e)));
+await pick.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+await pick.goto(pathToFileURL(resolve(page$)).href, { waitUntil: 'load', timeout: 60000 });
+await pick.waitForFunction('window.__B2D__ && window.__B2D__.ready', { timeout: 30000 });
+await settle(1600);
 
-// Which parts carry a balloon, so the legend assertion below is only made where
-// there is a legend row to light. A part with no callout lighting nothing is
-// correct, not a miss.
-const anchored = new Set(await page.evaluate(() =>
+const pickCdp = await pick.createCDPSession();
+const readPick = () => pick.evaluate(() => ({
+  card: document.getElementById('hoverCard').classList.contains('show'),
+  part: document.getElementById('hoverCard').querySelector('.n')?.textContent ?? '',
+  hotRows: document.querySelectorAll('#key .item.hot').length,
+}));
+
+/**
+ * Tap, then wait for the CONDITION rather than for a duration.
+ *
+ * The legend highlight lands synchronously inside `onHover`; the card naming
+ * the part is drawn by the main loop on a later frame. How much later is not
+ * knowable from here — a shared CI runner rendering through SwiftShader with
+ * rAF throttled is an order of magnitude off a laptop, and every attempt to
+ * pick a sleep that covers it has been a guess that held locally and broke
+ * there. So this polls until the card says what the tap should have made it
+ * say, and gives up on a deadline rather than on a frame count.
+ *
+ * @param {boolean} want - whether the card should end up showing
+ */
+const tap = async (x, y, want = true, deadlineMs = 4000) => {
+  await pickCdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 1 }] });
+  await pickCdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  const until = Date.now() + deadlineMs;
+  let s = await readPick();
+  while (s.card !== want && Date.now() < until) {
+    await settle(120);
+    s = await readPick();
+  }
+  return s;
+};
+
+/** Every numbered part's centre, in screen pixels, as the page sees it now. */
+const targets = await pick.evaluate(() => {
+  const B = window.__B2D__;
+  const V = B.stage.camera.position.constructor;
+  const nameOf = new Map(B.spec.parts.map((p) => [p.id, p.name]));
+  const out = [];
+  for (const c of B.spec.annotations?.callouts ?? []) {
+    const st = B.partState(c.anchor);
+    if (!st?.visible || !st.box) continue;
+    const [mn, mx] = st.box;
+    const v = new V((mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2);
+    v.project(B.stage.camera);
+    const x = (v.x * 0.5 + 0.5) * innerWidth;
+    const y = (-v.y * 0.5 + 0.5) * innerHeight;
+    if (x < 12 || x > innerWidth - 12 || y < 12 || y > innerHeight - 12) continue;
+    out.push({ id: c.anchor, name: nameOf.get(c.anchor) ?? c.anchor, x: Math.round(x), y: Math.round(y) });
+  }
+  return out;
+});
+
+const anchored = new Set(await pick.evaluate(() =>
   (window.__B2D__.spec.annotations?.callouts ?? []).map((c) => c.anchor)));
-const nameOf = await page.evaluate(() =>
+const idOfName = await pick.evaluate(() =>
   Object.fromEntries(window.__B2D__.spec.parts.map((p) => [p.name, p.id])));
 
-// Sweep the middle band rather than trusting one coordinate: the framing
-// depends on the subject's proportions and this file is run against whichever
-// sheet it is handed.
+/*
+   A point on the canvas with no model under it: below the drawing, above the
+   toolbar. Tapping it is how the selection is CLEARED between targets.
+
+   That clearing is not tidiness, it is what makes the wait mean anything. The
+   card is already showing after the first hit, so "wait until the card shows"
+   is satisfied before the next tap has been processed at all — and the read
+   comes back with the previous part's name against the new part's highlight.
+   That is how this managed to report a part as unnumbered while pointing at a
+   numbered one. Clear first, and every wait is a real transition.
+*/
+const BARE = { x: 195, y: 700 };
+
 let hit = null;
 let anchoredHit = null;
-for (let y = 380; y <= 500 && !anchoredHit; y += 20) {
-  for (let x = 120; x <= 280; x += 20) {
-    await touch('touchStart', [[x, y]]);
-    await touch('touchEnd');
-    // Frames, not milliseconds — the card and the legend are written by
-    // different clocks and only a painted frame has them agreeing.
-    await painted();
-    const s = await read();
-    if (!s.card) continue;
-    hit ??= { x, y, ...s };
-    if (anchored.has(nameOf[s.part])) { anchoredHit = { x, y, ...s }; break; }
-  }
+const named = [];
+for (const t of targets) {
+  await tap(BARE.x, BARE.y, false);
+  const s = await tap(t.x, t.y);
+  if (!s.card) continue;
+  named.push(s.part);
+  hit ??= { ...t, ...s };
+  // The tap lands on whatever surface is nearest the camera at that point,
+  // which need not be the part aimed at — so what matters is whether the part
+  // it DID name carries a balloon.
+  if (anchored.has(idOfName[s.part])) { anchoredHit = { ...t, ...s }; break; }
 }
 
-ok(!!hit, 'a tap on the model names the part', hit ? `"${hit.part}"` : 'nothing hit');
+ok(!!hit, 'a tap on the model names the part',
+  hit ? `"${hit.part}"` : `${targets.length} numbered part(s) aimed at, none named anything`);
 ok(!!anchoredHit && anchoredHit.hotRows === 1,
   'a tap on a numbered part lights exactly its legend row',
-  anchoredHit ? `"${anchoredHit.part}" -> ${anchoredHit.hotRows} row(s)` : 'no numbered part was hit');
+  anchoredHit
+    ? `"${anchoredHit.part}" -> ${anchoredHit.hotRows} row(s)`
+    : `named ${named.length ? named.join(', ') : 'nothing'} — none of them numbered`);
 
 if (hit) {
   // Long enough that a per-frame pick, if one were running, would have cleared
   // it several dozen times over.
   await settle(1200);
-  ok((await read()).card, 'the card stays up with no finger on the glass');
+  ok((await readPick()).card, 'the card stays up with no finger on the glass');
 
-  await touch('touchStart', [[12, 300]]);
-  await touch('touchEnd');
-  await painted();
-  ok(!(await read()).card, 'a tap on bare paper clears it');
+  ok(!(await tap(BARE.x, BARE.y, false)).card, 'a tap on bare paper clears it');
 }
+
+ok(pickErrors.length === 0, 'nothing threw while picking', pickErrors.slice(0, 2).join(' | '));
+await pick.close();
 
 /* ------------------------------------------------------------- layout */
 
@@ -234,7 +319,15 @@ console.log('\nnumbering — off by default here, and the framing knows');
   const balloons = () => page.evaluate(() =>
     [...document.querySelectorAll('#ann .balloon')].filter((c) => c.style.display !== 'none').length);
 
-  await page.evaluate(() => window.__B2D__.setView('iso'));
+  // The pinch above left the zoom wherever the last gesture put it, and every
+  // number below is a fraction of the viewport — so the zoom is wound back to 1
+  // explicitly. It used to be reset as a side effect of the picking section,
+  // which is exactly the kind of order dependency that makes a check pass for a
+  // reason nobody wrote down.
+  await page.evaluate(() => {
+    window.__B2D__.setView('iso');
+    window.__B2D__.zoom(1 / window.__B2D__.viewCtl.state.zoom);
+  });
   await settle(1600);
   const offOn = await page.evaluate(() => window.__B2D__.layerOn('callouts'));
   const wideFill = await width();
