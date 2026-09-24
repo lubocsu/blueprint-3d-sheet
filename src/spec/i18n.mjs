@@ -85,6 +85,7 @@ export const CHROME = {
     'row.panel': 'Panels',
     'row.layer': 'Layers',
     'row.focus': 'Focus',
+    'action.close': 'Close',
     'layer.callouts': 'Item numbers',
     'layer.dimensions': 'Dimensions',
     'hint': 'Drag to orbit · Scroll to zoom',
@@ -159,6 +160,7 @@ export const CHROME = {
     // 图层 是 CAD 中文里现成的词，读图的人不用学就懂它指什么。
     'row.layer': '图层',
     'row.focus': '专注',
+    'action.close': '关闭',
     // GB/T 10609.2 里气泡里的那个数字叫 序号，不叫 编号。
     'layer.callouts': '序号标注',
     // GB/T 4458.4 尺寸注法。

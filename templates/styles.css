@@ -123,6 +123,19 @@ html, body {
   overflow: visible;
 }
 
+/*
+   Catches a press anywhere outside an open drawer, so "put this away" does not
+   arrive at the canvas as "orbit the model". Only exists while a drawer is
+   open — see the phone breakpoint, which is the only width that has drawers.
+*/
+#scrim {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: 5;
+  background: none;
+}
+
 /* ---------------------------------------------------------------- sheet frame */
 
 .frame {
@@ -183,6 +196,27 @@ html, body {
   font-size: var(--fs-micro); letter-spacing: .1em;
   color: var(--label); margin-top: 4px;
 }
+
+/*
+   LANGUAGE, docked with the panel handles rather than in the toolbar.
+
+   Not for the room — it hands 104px back to a rail that still scrolls without
+   it. Because it is a different kind of control: everything in the toolbar
+   changes what you are looking at, and this changes what it is written in.
+   Grouped with the handles, in the same square ink-ruled idiom, it reads as a
+   property of the sheet, which is what it is.
+*/
+#langDock {
+  position: absolute;
+  right: calc(var(--pad) * 1.9);
+  top: calc(var(--pad) * 4.5);
+  z-index: 8;
+}
+#langDock { display: flex; gap: 5px; }
+#langDock .btn { min-width: var(--hit); padding: 0 9px; }
+/* Every language, current one lit — the form for a sheet with room for it. */
+#langDock .langAll { display: flex; gap: 5px; }
+#langDock .langCycle { display: none; }
 
 /* --------------------------------------------------------------------- panels */
 
@@ -400,6 +434,11 @@ html, body {
 
 /* console ------------------------------------------------------------------ */
 
+/*
+   The console is the BOX — position, rule, paper. `.rail` inside it is the
+   thing that scrolls, and the two are separate so the fade at the rail's ends
+   does not also fade the arrows drawn over them. See `.railEdge`.
+*/
 #console {
   position: absolute;
   left: calc(var(--pad) * 1.9);
@@ -407,10 +446,50 @@ html, body {
   background: color-mix(in srgb, var(--panel) 93%, transparent);
   border: 1.4px solid var(--rule);
   padding: 7px 9px;
-  display: grid;
-  gap: 5px;
   max-width: calc(100vw - var(--pad) * 3.8);
 }
+/* Each row holds one rail and that rail's two arrows. The arrows are
+   positioned against the ROW, which is not the scroller, so they stay put
+   while it moves and the rail's mask cannot reach them. */
+/* `min-width: 0` or the row refuses to be narrower than its content, the rail
+   inside it never clips, and there is no overflow for the scroller to scroll —
+   the same trap the console itself fell into before `width: auto`. */
+#console .railRow { position: relative; min-width: 0; }
+#console .rail { min-width: 0; }
+#console .rail {
+  display: grid;
+  gap: 5px;
+}
+
+/*
+   "There is more this way."
+
+   Hidden unless the rail can actually go that way — `chrome.mjs` writes which
+   on `#console` as `data-scroll`, since CSS cannot ask a scroller where it has
+   got to. `pointer-events: none` on purpose: these sit over the end buttons,
+   and an indicator that swallowed a press aimed at the control underneath
+   would cost more than it explains.
+*/
+.railEdge {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 26px;
+  display: none;
+  place-items: center;
+  pointer-events: none;
+  color: var(--ink);
+  opacity: .62;
+  z-index: 2;
+}
+.railEdge[data-edge="start"] { left: 0; }
+.railEdge[data-edge="end"]   { right: 0; }
+/* Only toward an end the rail has not reached. An arrow pointing back the way
+   you came, or one on a rail that fits, teaches a reader to ignore them. */
+.railRow[data-scroll="middle"] .railEdge,
+.railRow[data-scroll="start"] .railEdge[data-edge="end"],
+.railRow[data-scroll="end"]   .railEdge[data-edge="start"] { display: grid; }
+.railEdge[data-edge="start"] .ic { transform: rotate(180deg); }
+.railEdge .ic { width: 15px; height: 15px; }
 .ctrlRow { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .ctrlRow > .rowLabel {
   width: 52px; flex: none;
@@ -710,9 +789,24 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
   width: max-content;
   max-width: calc(100vw - var(--pad) * 3.8);
   margin-inline: auto;
+}
+/* Side by side, so the split into two rails is invisible where everything
+   fits on one line anyway — and `flex: none` on the rows, because here the
+   point is that nothing is clipped at all. */
+#console {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+#console .railRow { flex: none; }
+#console .rail {
   grid-auto-flow: column;
   align-items: center;
   gap: 9px;
+}
+#console .railRow + .railRow {
+  border-left: 1px solid color-mix(in srgb, var(--ink) 32%, transparent);
+  padding-left: 9px;
 }
 #console .ctrlRow + .ctrlRow {
   border-left: 1px solid color-mix(in srgb, var(--ink) 32%, transparent);
@@ -725,6 +819,9 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
 /* Every panel is reached from the toolbar here, the title block included, so
    it carries a header like the other two. */
 #titleblock > h2 { display: flex; }
+/* The readouts keep the corner; language tucks under them. */
+#sheet[data-panel-instr="shut"] #instr { top: calc(var(--pad) * 4.5); }
+#langDock { top: calc(var(--pad) * 4.5 + var(--hit) + 8px); }
 
 /* ======================================================================
    WIDTHS
@@ -751,10 +848,16 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
     --pad: 10px;
     --ic: 19px;
     --hit: 38px;
-    --fs-micro: 9px;
-    --fs-small: 10.5px;
-    --fs-body:  11.5px;
-    --fs-title: 12.5px;
+    /*
+       Raised from 9 / 10.5 / 11.5. The scale above is tuned for a sheet read at
+       arm's length on a desk; the same numbers on a phone held at reading
+       distance are a third smaller than anything else on the device, and the
+       legend is the part a reader actually has to read.
+    */
+    --fs-micro: 10.5px;
+    --fs-small: 12.5px;
+    --fs-body:  13.5px;
+    --fs-title: 13px;
   }
 
   /* Pure decoration, and at this width it is the only thing on the paper that
@@ -798,39 +901,44 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
   #sheet { --panel-overlay: yes; --card-docked: yes; }
 
   /*
-     An open panel on a phone takes the paper.
+     AN OPEN PANEL ON A PHONE IS A DRAWER, and the drawing stays in sight.
 
-     Half-covering the drawing was the first attempt and it is the worst of
-     both: the model is behind the card exactly where it is centred, so what
-     shows above it is blank paper, and the numbering has nowhere to go and is
-     suppressed anyway. Since none of the drawing survives an open panel here,
-     the panel may as well be the reading surface — top to bottom between the
-     heading and the toolbar, both of which stay put so it is still obvious
-     which sheet this is and how to get back to it.
+     Two earlier attempts are worth recording. Half-covering the sheet put the
+     card exactly over the centred model and left blank paper above it. Taking
+     the whole page fixed that and created a worse problem — nothing of the
+     drawing survived, so there was no sense of still being on it, and with the
+     handle briefly unhittable there was no way back either.
+
+     A drawer rising from the bottom edge keeps the top of the sheet, and the
+     runtime lifts the model into that band while one is open (see
+     `setViewOffset`) so what is left visible is the subject rather than margin.
   */
   #sheet[data-panel-key="open"]   #key,
   #sheet[data-panel-instr="open"] #instr,
   #sheet[data-panel-tb="open"]    #titleblock {
     position: fixed;
-    left: var(--pad); right: var(--pad);
-    top: calc(var(--pad) * 4.6);
+    left: 0; right: 0;
+    top: auto;
     bottom: calc(var(--hit) + var(--pad) * 3.4);
     width: auto;
+    height: 60vh;
+    height: 60dvh;
     max-height: none;
     overflow: auto;
     overscroll-behavior: contain;
-    /* Opaque, not the 93% the docked panels use. A panel this size is being
-       READ, and the model showing faintly through forty lines of legend is
-       texture behind text, not context. */
+    /* Opaque: a surface this size is being READ, and the model showing faintly
+       through forty lines of legend is texture behind text, not context. */
     background: var(--panel);
-    box-shadow: 0 10px 34px -12px color-mix(in srgb, var(--ink) 58%, transparent);
+    border: 0;
+    border-top: 1.6px solid var(--rule);
+    box-shadow: 0 -12px 34px -14px color-mix(in srgb, var(--ink) 55%, transparent);
     z-index: 6;
   }
   /* The other two handles stay reachable on top of it, so the panels read as
      three tabs of one surface rather than three separate errands. */
   #sheet[data-panel-key="shut"]   #key,
   #sheet[data-panel-instr="shut"] #instr,
-  #sheet[data-panel-tb="shut"]    #titleblock { z-index: 7; }
+  #sheet[data-panel-tb="shut"]    #titleblock { z-index: 8; }
   #sheet[data-panel-key="open"] #key > h2,
   #sheet[data-panel-instr="open"] #instr > h2,
   #sheet[data-panel-tb="open"] #titleblock > h2 {
@@ -838,12 +946,42 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
     display: flex;
   }
 
+  /*
+     The tap-anywhere-else target.
+
+     Transparent on purpose — the whole point of the drawer is that the drawing
+     is still there to look at, and dimming it to signal modality would undo
+     that. It also stops a tap above the drawer orbiting the model when what the
+     reader meant was "put this away".
+  */
+  #sheet[data-any-panel="open"] #scrim { display: block; }
+
   /* Folded, they are handles parked in the corners they came from. */
   #sheet[data-panel-key="shut"]   #key        { left: var(--pad); top: calc(var(--pad) * 4.6); }
   #sheet[data-panel-instr="shut"] #instr      { right: var(--pad); top: calc(var(--pad) * 4.6); width: auto; }
   #sheet[data-panel-tb="shut"]    #titleblock { right: var(--pad); top: calc(var(--pad) * 4.6 + var(--hit) + 6px); bottom: auto; width: auto; }
+  /* Third in the right-hand column, under the readouts and the title block. */
+  #langDock {
+    right: var(--pad);
+    top: calc(var(--pad) * 4.6 + (var(--hit) + 6px) * 2);
+  }
+  #langDock .btn { height: var(--hit); padding: 0 8px; }
+  /* One button naming where it takes you: there is no room beside three panel
+     handles for one per language. */
+  #langDock .langAll { display: none; }
+  #langDock .langCycle { display: block; }
 
   #key .items { padding: 8px 8px 8px 8px; }
+
+  /* A drawer is the reading surface, so its contents get a step more than the
+     furniture around them. */
+  #sheet[data-panel-key="open"]   #key .item,
+  #sheet[data-panel-instr="open"] #instr .row,
+  #sheet[data-panel-tb="open"]    #titleblock .cell .v { font-size: 13.5px; }
+  #sheet[data-panel-key="open"] #key .item { padding: 5px 6px 5px 0; }
+  #sheet[data-panel-key="open"] #key .bal { width: 20px; height: 20px; font-size: 11px; }
+  #sheet[data-panel-instr="open"] #instr .rows { padding: 10px 14px 12px; }
+  #sheet[data-panel-instr="open"] #instr .row { line-height: 2; }
   #titleblock .cells { grid-template-columns: repeat(2, 1fr); }
 
   /*
@@ -851,21 +989,71 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
      controls would take a quarter of the screen; a single strip takes one
      button's worth and the groups stay in their drafting order, ruled apart.
   */
+  /*
+     TWO ROWS here, and only here. A wide sheet fits the whole toolbar on one
+     line — `data-scroll` reports `none` and no arrow ever shows — so splitting
+     it there would buy nothing and cost a line of height.
+  */
   #console {
+    display: grid;
+    grid-auto-flow: row;
+    gap: 4px;
     left: var(--pad); right: var(--pad);
     bottom: var(--pad);
+    /*
+       `width: auto` matters as much as the overflow below it.
+
+       The wide layout sizes this box to `max-content` so it can be centred by
+       auto margins. Left as that here it grows to fit all eleven buttons —
+       1070px on a 390px screen — and a box as wide as its content has no
+       overflow, so `overflow-x` has nothing to scroll and the far end is simply
+       off the screen with no way to reach it. Being clipped by `left`/`right`
+       is what makes it a rail.
+    */
+    width: auto;
     max-width: none;
     padding: 5px 6px;
+  }
+  #console .railRow + .railRow { border-left: 0; padding-left: 0; }
+  #console .rail {
     display: flex;
     grid-auto-flow: unset;
-    transform: none;
     align-items: stretch;
     gap: 0;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
+    /* Let a flick carry rather than stopping dead at the finger. */
+    -webkit-overflow-scrolling: touch;
+    /* A snap that lands a flick on a group boundary rather than mid-button. */
+    scroll-snap-type: x proximity;
+    scroll-padding: 0 10px;
   }
-  #console::-webkit-scrollbar { display: none; }
+
+  /*
+     The fade goes where there is something to fade INTO.
+
+     A gradient at both ends regardless would dim the first button while the
+     rail is already at its start, which says "cut off" about something that is
+     not — and it is the selected view button that sits there. So the mask
+     follows the same `data-scroll` the arrows do.
+  */
+  .railRow[data-scroll="start"] .rail {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent 100%);
+  }
+  .railRow[data-scroll="end"] .rail {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 26px);
+    mask-image: linear-gradient(to right, transparent 0, #000 26px);
+  }
+  .railRow[data-scroll="middle"] .rail {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 26px,
+                        #000 calc(100% - 26px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 26px,
+                #000 calc(100% - 26px), transparent 100%);
+  }
+  #console .rail::-webkit-scrollbar { display: none; }
+  #console .ctrlRow { scroll-snap-align: start; }
   /* `flex: none` on both levels or there is no overflow to scroll: flex would
      rather crush eleven buttons into the width it has than admit they do not
      fit, and the strip silently becomes a pile. */
@@ -875,6 +1063,10 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
   }
   #console .rowLabel { display: none; }
   #console .btn { flex: none; }
+
+  /* The arrows, shown only toward an end the rail has not reached. The fade
+     alone says "something is cut off"; the arrow says which way to push. */
+
 
   /* Nothing hovers here, so the name comes out from under the clip and sits
      under its glyph. */
@@ -891,9 +1083,9 @@ html[lang^="zh"] .panelToggle[data-tip]::after { letter-spacing: .06em; }
     margin: 0;
     clip-path: none;
     overflow: visible;
-    font-size: 8.5px;
-    letter-spacing: .04em;
-    line-height: 1;
+    font-size: 10px;
+    letter-spacing: .02em;
+    line-height: 1.1;
     /* Enough to tell RUN from DRIVE, not enough for one long name to push the
        rest of the strip off the far end. The tooltip is gone here anyway — the
        full name is in the panel this button opens. */

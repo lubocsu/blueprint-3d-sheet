@@ -14,6 +14,9 @@ import * as THREE from 'three';
 
 const DEG = Math.PI / 180;
 
+/** How long the drawing takes to slide clear of something covering it. */
+const OFFSET_MS = 340;
+
 const FOV_PERSP = 30;
 const FOV_ORTHO = 2.2;
 const TWEEN_MS = 900;
@@ -42,6 +45,36 @@ export function createViewController(camera, spec, { sceneDiag = 10, bbox = null
    */
   let fitGain = 1;
 
+  /**
+   * The part of the viewport something else is covering.
+   *
+   * A drawer rising over a phone's lower half hides the model, which sits
+   * centred. Sliding the view up by a guessed constant got most of the way and
+   * left the bottom of the subject behind the drawer's edge, because how much
+   * to slide depends on how tall the drawer is and how tall the subject
+   * projects — neither of which a constant knows.
+   *
+   * So the caller states what is covered and the framing follows: the drawing
+   * is fitted to the band that is left AND centred in it. Both the camera and
+   * its target move along the camera's own up vector, so scale, framing and
+   * every projected annotation stay consistent with each other.
+   */
+  let safeTop = 0;
+  let safeBottom = 0;
+  /** Where the offset is easing from, and when it started. See `update`. */
+  let offsetFrom = 0;
+  let offsetAt = -1e9;
+
+  /** The fraction of the viewport height the drawing may actually use. */
+  const usable = () => Math.max(1 - safeTop - safeBottom, 0.12);
+  /** How far up the screen the subject must sit to be centred in that band. */
+  const wantOffset = () => 0.5 - (safeTop + usable() / 2);
+  /** The eased value right now, so a change mid-ease starts from here. */
+  const currentOffset = () => {
+    const k = Math.min((performance.now() - offsetAt) / OFFSET_MS, 1);
+    return offsetFrom + (wantOffset() - offsetFrom) * easeInOut(k);
+  };
+
   // The eight corners of the fit bounding box. Projecting these onto the
   // camera's basis gives the exact on-screen extent for any view direction,
   // which is what lets a plan view of a long vehicle fill the sheet instead of
@@ -69,7 +102,8 @@ export function createViewController(camera, spec, { sceneDiag = 10, bbox = null
   const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
   /** Distance at which the projected silhouette fills `fit` of the viewport. */
-  function fitDistance(az, el, fov, target, fit) {
+  function fitDistance(az, el, fov, target, fit, heightFrac) {
+    const hFrac = heightFrac || 1;
     const fallback = sceneDiag * 0.62 / Math.tan((fov / 2) * DEG);
     if (!corners.length) return fallback;
 
@@ -89,7 +123,9 @@ export function createViewController(camera, spec, { sceneDiag = 10, bbox = null
 
     const tanY = Math.tan((fov / 2) * DEG);
     const aspect = camera.aspect || 1.6;
-    const need = Math.max(halfH / (tanY * fit), halfW / (tanY * aspect * fit));
+    // The vertical term is measured against the band left over, not the whole
+    // viewport — that is what stops the subject growing back into the drawer.
+    const need = Math.max(halfH / (tanY * fit * hFrac), halfW / (tanY * aspect * fit));
     return Math.max(need, sceneDiag * 0.02);
   }
 
@@ -173,7 +209,7 @@ export function createViewController(camera, spec, { sceneDiag = 10, bbox = null
     // per cent. At 0.78 that slack is invisible. Near 1 it is the difference
     // between a framed drawing and a cropped one.
     const fit = Math.min(state.fit * fitGain, FIT_CEILING) * state.zoom;
-    const dist = fitDistance(state.az, state.el, state.fov, state.target, fit) * state.distMul;
+    const dist = fitDistance(state.az, state.el, state.fov, state.target, fit, usable()) * state.distMul;
 
     const el = Math.max(-89.5, Math.min(89.5, state.el)) * DEG;
     const az = state.az * DEG;
@@ -184,6 +220,38 @@ export function createViewController(camera, spec, { sceneDiag = 10, bbox = null
       state.target.z + Math.cos(az) * r,
     );
     camera.lookAt(state.target);
+
+    /*
+       Eased over TIME, not per frame.
+
+       A `+= (want - now) * k` each frame is a different duration on every
+       machine — it converged in a third of a second here and was still a tenth
+       short after nearly two seconds under a software renderer, which is how it
+       first looked like the arithmetic was wrong rather than unfinished. The
+       view tween above is measured against the clock for the same reason.
+    */
+    const want = wantOffset();
+    const k = Math.min((performance.now() - offsetAt) / OFFSET_MS, 1);
+    const offsetNow = offsetFrom + (want - offsetFrom) * easeInOut(k);
+
+    /*
+       The shift is applied to the PROJECTION, not to the camera.
+    
+       Translating a perspective camera sideways moves near points further
+       across the screen than far ones, so a subject that spans depth does not
+       shift by the amount asked for — it came out about a tenth short, which is
+       exactly the sort of residue that gets "corrected" with a fudge factor.
+       `setViewOffset` windows the frustum instead: every point moves by the
+       same screen distance, by construction, and the projection matrix the
+       annotation layer reads is the same one.
+    */
+    const VH = 1000;
+    if (offsetNow !== 0) {
+      const aspectNow = camera.aspect || 1.6;
+      camera.setViewOffset(VH * aspectNow, VH, 0, offsetNow * VH, VH * aspectNow, VH);
+    } else {
+      camera.clearViewOffset();
+    }
 
     camera.fov = state.fov;
     // Hug the subject so depth precision survives the very long distances the
@@ -207,6 +275,24 @@ export function createViewController(camera, spec, { sceneDiag = 10, bbox = null
      * rather than jumping.
      */
     setFitGain(g) { fitGain = Math.max(1, Number(g) || 1); },
+
+    /**
+     * Declare what is covering the viewport, in fractions of its height, and
+     * the drawing is fitted to and centred in what remains. Both default to 0,
+     * which is the whole sheet and the behaviour every wide layout gets.
+     */
+    setSafeArea(top = 0, bottom = 0) {
+      const clamp = (v) => Math.min(Math.max(Number(v) || 0, 0), 0.8);
+      const nextTop = clamp(top);
+      const nextBottom = clamp(bottom);
+      if (nextTop === safeTop && nextBottom === safeBottom) return;
+      // Start the ease from wherever it had got to, so a drawer closed halfway
+      // through the last one does not jump.
+      offsetFrom = currentOffset();
+      offsetAt = performance.now();
+      safeTop = nextTop;
+      safeBottom = nextBottom;
+    },
     get currentId() { return currentId; },
     get current() { return views.find((v) => v.id === currentId) ?? null; },
     get isOrtho() { return state.fov < (FOV_PERSP + FOV_ORTHO) / 2; },

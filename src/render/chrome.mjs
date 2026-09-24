@@ -204,6 +204,8 @@ export function buildChrome(rootEl, spec, {
    */
   const decided = new Set();
   const panelNodes = new Map();
+  /** Each panel's own handle, the one that lives in its header. */
+  const headToggles = new Map();
 
   /** Set from `--card-docked`; see `showCard`. */
   let cardDocked = false;
@@ -268,12 +270,13 @@ export function buildChrome(rootEl, spec, {
     const h = el('h2');
     const btn = el('button', 'panelToggle');
     btn.type = 'button';
-    btn.innerHTML = uiGlyph(p.glyph);
-    dynAttr(btn, 'data-tip', () => t(p.name));
-    dynAttr(btn, 'aria-label', () => t(p.name));
     btn.addEventListener('click', () => setPanel(p.key, panelState(p.key) !== 'open', { byReader: true }));
     h.appendChild(btn);
     h.appendChild(dyn(el('span', 'h2Text'), () => t(p.name)));
+    // The glyph and the name are written by `paintPanelButtons`, not registered
+    // through `dynAttr`: they depend on whether the panel is open as well as on
+    // the language, and `dynAttr` only re-reads on a language change.
+    headToggles.set(p.key, btn);
     return h;
   }
 
@@ -387,6 +390,47 @@ export function buildChrome(rootEl, spec, {
 
   const consoleEl = el('section');
   consoleEl.id = 'console';
+
+  /*
+     The console is a BOX; the rail inside it is what scrolls.
+    
+     They have to be two elements. The fade that says "there is more this way"
+     is a mask, a mask applies to the whole element including anything drawn on
+     it, and an arrow drawn on the scroller would therefore be faded out by the
+     very gradient meant to frame it. So the scrolling, the mask and the snap
+     live on the rail, and the arrows sit on the box outside it.
+  */
+  /*
+     TWO rails, on one measurement: the view buttons come to 345px and a phone
+     leaves 356px. On their own they fit — the control a reader reaches for most
+     stops needing to be scrolled to at all. Everything else together is 723px
+     and scrolls whatever is done to it, so it takes the second rail and the
+     arrows earn their keep there. A wide sheet lays the two side by side and
+     the split is invisible.
+
+     That fit is a property of these specs, not a guarantee: `spec.views` has no
+     length limit. A sheet with more views simply scrolls that rail too, with
+     the same arrows.
+  */
+  const rails = [];
+  const railRow = (name) => {
+    const rowEl = el('div', 'railRow');
+    rowEl.dataset.row = name;
+    const rail = el('div', 'rail');
+    rowEl.appendChild(rail);
+    for (const edge of ['start', 'end']) {
+      const a = el('span', 'railEdge');
+      a.dataset.edge = edge;
+      a.innerHTML = uiGlyph('chevron');
+      a.setAttribute('aria-hidden', 'true');
+      rowEl.appendChild(a);
+    }
+    consoleEl.appendChild(rowEl);
+    rails.push({ rail, rowEl });
+    return rail;
+  };
+  const viewRail = railRow('view');
+  const railEl = railRow('rest');
   const viewButtons = new Map();
   const motionButtons = new Map();
   const langButtons = new Map();
@@ -431,7 +475,7 @@ export function buildChrome(rootEl, spec, {
       row.appendChild(b);
       viewButtons.set(v.id, b);
     }
-    consoleEl.appendChild(row);
+    viewRail.appendChild(row);
   }
 
   if (spec.motions?.length) {
@@ -442,7 +486,7 @@ export function buildChrome(rootEl, spec, {
       row.appendChild(b);
       motionButtons.set(m.id, b);
     }
-    consoleEl.appendChild(row);
+    railEl.appendChild(row);
   }
 
   // The annotation layers. A sheet carrying sixteen balloons and a full
@@ -460,7 +504,7 @@ export function buildChrome(rootEl, spec, {
       row.appendChild(b);
       layerButtons.set(l.key, b);
     }
-    consoleEl.appendChild(row);
+    railEl.appendChild(row);
   }
 
   // The panels, next to the layers, because they are the same question: what
@@ -492,29 +536,103 @@ export function buildChrome(rootEl, spec, {
     });
     row.appendChild(focus);
     panelButtons.set('_focus', focus);
-    consoleEl.appendChild(row);
+    railEl.appendChild(row);
   }
 
-  // The language row appears only when there is a second language to go to.
-  // Button text is each language's own name, never translated — a reader
-  // looking for Chinese is looking for 中文, not for whatever "Chinese" is in
-  // the language they cannot read.
+  /*
+     Which way there is more to see, PER RAIL.
+
+     Written as an attribute from a scroll listener rather than drawn by CSS,
+     because CSS cannot ask a scroller where it has got to — scroll-driven
+     animations can, and are not in every browser this page has to open in.
+     Four states: `none` when everything fits, then `start`, `middle`, `end`.
+     The view rail usually reports `none`, which is the whole point of giving it
+     a row of its own.
+  */
+  function paintRail() {
+    for (const { rail, rowEl } of rails) {
+      // A rail only scrolls where the stylesheet made it a scroller. An
+      // element with visible overflow still reports `scrollWidth` past its
+      // `clientWidth` when its content sticks out, so measuring the difference
+      // alone put an arrow on a wide sheet where nothing was ever clipped.
+      const scrolls = /auto|scroll/.test(getComputedStyle(rail).overflowX);
+      const slack = scrolls ? rail.scrollWidth - rail.clientWidth : 0;
+      let where = 'none';
+      if (slack > 2) {
+        const x = rail.scrollLeft;
+        if (x <= 1) where = 'start';
+        else if (x >= slack - 1) where = 'end';
+        else where = 'middle';
+      }
+      rowEl.setAttribute('data-scroll', where);
+    }
+  }
+  for (const { rail } of rails) rail.addEventListener('scroll', paintRail, { passive: true });
+
+  rootEl.appendChild(consoleEl);
+
+  /*
+     LANGUAGE IS NOT A DRAWING CONTROL.
+
+     Everything in the console changes what you are LOOKING AT. This changes
+     what it is WRITTEN IN — a property of the sheet, like its units or its
+     projection, not of the view. Sitting between the motions and the layers it
+     read as one more thing to try; docked with the panel handles it reads as
+     what it is. That is the reason it moved. The 104px it hands back to the
+     rail is not: the rail still scrolls without it.
+
+     It names the language you would GET, never the one you are in. A button
+     labelled 中文 because Chinese is already on screen tells a reader nothing
+     about what pressing it does; labelled 中文 while the sheet is in English it
+     tells them exactly. With more than two languages it cycles.
+  */
   const locales = localeList(spec);
+  const langDock = el('div');
+  langDock.id = 'langDock';
   if (locales.length > 1) {
-    const row = group('lang', 'row.lang');
+    /*
+       BOTH FORMS are built; the stylesheet shows one.
+
+       Where there is room, every language is its own button with the current
+       one lit — a reader sees at a glance what the sheet offers and what it is
+       in. A phone has no such room beside three panel handles, so there it is a
+       single button naming the language you would GET: labelled 中文 while the
+       sheet is in English, it says exactly what pressing it does, which a
+       button labelled 中文 because Chinese is already on screen does not.
+
+       Built here, chosen there, for the same reason as everything else on this
+       sheet: which one fits is a width question, and width questions belong to
+       the stylesheet.
+    */
+    const all = el('div', 'langAll');
     for (const l of locales) {
       const b = el('button', 'btn lang', l.label);
       b.type = 'button';
       b.lang = l.code;
-      dynAttr(b, 'data-tip', () => l.label);
+      b.setAttribute('data-tip', l.label);
       b.setAttribute('aria-label', l.label);
       b.addEventListener('click', () => onLocale?.(l.code));
-      row.appendChild(b);
+      all.appendChild(b);
       langButtons.set(l.code, b);
     }
-    consoleEl.appendChild(row);
+    langDock.appendChild(all);
+
+    const cycle = el('div', 'langCycle');
+    const one = el('button', 'btn lang');
+    one.type = 'button';
+    const nextLocale = () => locales[(locales.findIndex((l) => l.code === lang) + 1) % locales.length];
+    refresh.push(() => {
+      const next = nextLocale();
+      one.textContent = next.label;
+      one.lang = next.code;
+      one.setAttribute('data-tip', next.label);
+      one.setAttribute('aria-label', `${t('row.lang')}: ${next.label}`);
+    });
+    one.addEventListener('click', () => onLocale?.(nextLocale().code));
+    cycle.appendChild(one);
+    langDock.appendChild(cycle);
   }
-  rootEl.appendChild(consoleEl);
+  rootEl.appendChild(langDock);
 
   /* ----------------------------------------------------------------- layers */
 
@@ -563,6 +681,26 @@ export function buildChrome(rootEl, spec, {
   hint.id = 'hint';
   rootEl.appendChild(hint);
 
+  /*
+   * Press anywhere outside an open drawer to put it away.
+   *
+   * It has to be an element rather than a handler on the canvas: the canvas
+   * would read the same press as an orbit, and a reader dismissing a panel has
+   * not asked to turn the model. The stylesheet decides whether it exists at
+   * all — only the width that has drawers does.
+   */
+  const scrim = el('div');
+  scrim.id = 'scrim';
+  scrim.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    for (const p of PANELS) {
+      if (panelNodes.has(p.key) && panelState(p.key) === 'open') {
+        setPanel(p.key, false, { byReader: true });
+      }
+    }
+  });
+  rootEl.appendChild(scrim);
+
   const card = el('div');
   card.id = 'hoverCard';
   const cardN = el('div', 'n');
@@ -577,19 +715,39 @@ export function buildChrome(rootEl, spec, {
 
   function paintPanelButtons() {
     let anyOpen = false;
+    // Declared here rather than in CSS because "is anything open" is state, and
+    // state is this file's to write.
+
     for (const p of PANELS) {
       if (!panelNodes.has(p.key)) continue;
       const open = panelState(p.key) === 'open';
       anyOpen = anyOpen || open;
       panelButtons.get(p.key)?.classList.toggle('on', open);
+
+      // An open panel's handle is the way back out, so it says so. On a phone
+      // the panel covers the drawing and that handle is the ONLY way back, and
+      // a reader who does not recognise it as one is stuck on a page they
+      // cannot leave — which is exactly what happened.
+      const head = headToggles.get(p.key);
+      if (head) {
+        head.innerHTML = uiGlyph(open ? 'close' : p.glyph);
+        const name = open ? t('action.close') : t(p.name);
+        head.setAttribute('data-tip', name);
+        head.setAttribute('aria-label', name);
+        head.setAttribute('aria-expanded', String(open));
+      }
     }
     panelButtons.get('_focus')?.classList.toggle('on', !anyOpen);
+    rootEl.setAttribute('data-any-panel', anyOpen ? 'open' : 'shut');
   }
 
   /** Re-read every registered string, and light up the active language. */
   function paint() {
     for (const fn of refresh) fn();
     for (const [code, b] of langButtons) b.classList.toggle('on', code === lang);
+    paintPanelButtons();
+    // Button names change width with the language, so what fits changes too.
+    paintRail();
   }
 
   // Both the panels and the layers take their opening state from the stylesheet,
@@ -658,6 +816,9 @@ export function buildChrome(rootEl, spec, {
     /** Re-ask the stylesheet where the panels go. Cheap; call it on resize. */
     applyPanelDefaults,
 
+    /** Re-check which way the toolbar can still be scrolled. Call it on resize. */
+    paintRail,
+
     /**
      * True when an open panel is covering the drawing rather than sitting
      * beside it — a phone, essentially, where a panel is a card over the model.
@@ -667,6 +828,33 @@ export function buildChrome(rootEl, spec, {
      * balloon, and the solver will dutifully find the sliver of paper that is
      * left and run every leader into it.
      */
+    /**
+     * What an open drawer is covering, as fractions of the viewport height —
+     * measured, not assumed, because the drawer's height is the stylesheet's
+     * decision and a number copied over here would be a second opinion about it.
+     * `{ top: 0, bottom: 0 }` when nothing is in the way.
+     */
+    safeArea() {
+      if (!this.panelsOverlaying) return { top: 0, bottom: 0 };
+      const h = window.innerHeight || 1;
+      let highest = h;
+      for (const p of PANELS) {
+        if (!panelNodes.has(p.key) || panelState(p.key) !== 'open') continue;
+        highest = Math.min(highest, panelNodes.get(p.key).getBoundingClientRect().top);
+      }
+      // The heading keeps the top of the sheet; the drawer takes the bottom.
+      const brand = rootEl.querySelector('.brand');
+      const title = rootEl.querySelector('.docTitle');
+      const head = Math.max(
+        brand ? brand.getBoundingClientRect().bottom : 0,
+        title ? title.getBoundingClientRect().bottom : 0,
+      );
+      return {
+        top: Math.min(Math.max((head + 8) / h, 0), 0.4),
+        bottom: Math.min(Math.max(1 - highest / h, 0), 0.8),
+      };
+    },
+
     get panelsOverlaying() {
       if (getComputedStyle(rootEl).getPropertyValue('--panel-overlay').trim() !== 'yes') return false;
       return PANELS.some((p) => panelNodes.has(p.key) && panelState(p.key) === 'open');
