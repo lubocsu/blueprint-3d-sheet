@@ -249,10 +249,16 @@ separation glyph, and one that runs an emitter gets particles, with nothing
 written down. Writing `icon` overrides that, and an override is a claim about
 the motion that the geometry can then quietly stop agreeing with.
 
-It is worth knowing what happens when the derivation finds nothing: a motion
-that pushes a driver **no channel reads** has no glyph to earn, and gets the
-generic one. That is usually not an icon problem. It means the button does not
-move anything, which is worth checking before reaching for `icon` to cover it.
+**A motion is not a use of a driver.** Every driver needs both sides: something
+that sets it (a motion, or a view's `set`) and something that reads it (a
+channel expression, or an instrument). A driver with only the write side is a
+console button that does nothing when pressed — validate reports it, and
+`--strict` fails on it.
+
+A generic glyph on a motion button is usually that same fault seen from the
+other end, and not an icon problem: the derivation found no animation primitive
+to follow because the driver reaches none. Fix the binding rather than reaching
+for `icon` to cover the half of it you can see.
 
 ## Views, dimensions, callouts
 
