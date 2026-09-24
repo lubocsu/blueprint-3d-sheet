@@ -511,20 +511,49 @@ console.log('\nthe rail — every control reachable on a narrow screen');
      `none` while the row under them is mid-scroll, and an arrow on the wrong
      row is as misleading as an arrow pointing nowhere.
   */
+  /*
+     Drive the rail to a position and read what the arrows say about it.
+
+     POLLED, not slept for. `data-scroll` is written from a scroll event, and a
+     scroll event arrives on its own schedule — one `settle(400)` was enough on
+     a laptop and was not on a loaded runner, where this reported `at: "start"`
+     for a scroll that had in fact happened. Same shape as the tap race earlier
+     in this file: waiting a fixed time for an asynchronous thing.
+
+     Scroll snapping was suspected first and measured second: asked for 130,
+     landed on 130, on both subjects, snapping on. It is not involved, so
+     nothing here turns it off.
+
+     The achieved position is reported alongside the verdict. A failure saying
+     only "wrong arrows" sends the next reader back to the beginning.
+  */
   const arrows = async (scrollTo) => {
     await page.evaluate((x) => {
       const r = document.querySelector('.railRow[data-row="rest"] .rail');
       r.scrollLeft = x === 'end' ? r.scrollWidth : x;
     }, scrollTo);
-    await settle(400);
-    return page.evaluate(() => {
-      const el = document.querySelector('.railRow[data-row="rest"]');
-      const shown = (edge) => {
-        const n = el.querySelector(`.railEdge[data-edge="${edge}"]`);
-        return !!n && getComputedStyle(n).display !== 'none';
-      };
-      return { at: el.getAttribute('data-scroll'), start: shown('start'), end: shown('end') };
-    });
+
+    const want = scrollTo === 'end' ? 'end' : (scrollTo === 0 ? 'start' : 'middle');
+    const until = Date.now() + 4000;
+    let got;
+    do {
+      await settle(120);
+      got = await page.evaluate(() => {
+        const el = document.querySelector('.railRow[data-row="rest"]');
+        const r = el.querySelector('.rail');
+        const shown = (edge) => {
+          const n = el.querySelector(`.railEdge[data-edge="${edge}"]`);
+          return !!n && getComputedStyle(n).display !== 'none';
+        };
+        return {
+          at: el.getAttribute('data-scroll'),
+          left: Math.round(r.scrollLeft),
+          max: Math.round(r.scrollWidth - r.clientWidth),
+          start: shown('start'), end: shown('end'),
+        };
+      });
+    } while (got.at !== want && Date.now() < until);
+    return got;
   };
 
   const atStart = await arrows(0);
