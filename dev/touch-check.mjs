@@ -54,7 +54,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 // coarse-pointer rules apply.
 await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
 await page.goto(pathToFileURL(resolve(page$)).href, { waitUntil: 'load', timeout: 60000 });
-await page.waitForFunction('window.__B2D__ && window.__B2D__.ready', { timeout: 30000 });
+await ready(page, 'gestures');
 await new Promise((r) => setTimeout(r, 1200));
 
 const cdp = await page.createCDPSession();
@@ -63,6 +63,25 @@ const touch = (type, pts = []) => cdp.send('Input.dispatchTouchEvent', {
   touchPoints: pts.map(([x, y], i) => ({ x, y, id: i + 1 })),
 });
 const settle = (ms = 260) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Wait for a sheet to finish starting up.
+ *
+ * Sixty seconds, not thirty, and said out loud when it lapses. This file opens
+ * four pages, each a self-contained three-quarters-of-a-megabyte page building
+ * a full scene, and in CI it runs straight after two selftests have driven
+ * thirty screenshots through the same machine. One engine run failed here under
+ * exactly that load and passed three times over when run on its own — which is
+ * the signature of a timeout, and the least useful kind of red build there is.
+ */
+async function ready(p, label) {
+  try {
+    await p.waitForFunction('window.__B2D__ && window.__B2D__.ready', { timeout: 60000 });
+  } catch {
+    throw new Error(`the ${label} page never reported ready — it did not start, `
+      + 'or the machine was too loaded to start it inside a minute');
+  }
+}
 
 /**
  * Wait for the page to actually PAINT, not for a stopwatch.
@@ -155,7 +174,7 @@ const pickErrors = [];
 pick.on('pageerror', (e) => pickErrors.push(String(e)));
 await pick.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
 await pick.goto(pathToFileURL(resolve(page$)).href, { waitUntil: 'load', timeout: 60000 });
-await pick.waitForFunction('window.__B2D__ && window.__B2D__.ready', { timeout: 30000 });
+await ready(pick, 'picking');
 await settle(1600);
 
 const pickCdp = await pick.createCDPSession();
@@ -315,6 +334,267 @@ console.log('\nlayout — what a coarse pointer gets instead of hover');
   ok(probe.overlay === 'yes', 'and open over the drawing rather than beside it');
 }
 
+/* ------------------------------------------------------- the way back out */
+
+/*
+ * Reported from a phone against the published demo: the three panels opened and
+ * could not be closed again.
+ *
+ * Both halves of that were real. The handle stopped being hittable, because
+ * opening a panel called `bump()`, which dropped the annotation opacity, which
+ * raised `.busy`, which hides the panels — so the panel just opened was hidden
+ * and the tap meant for its handle reached the canvas underneath and orbited
+ * the model, re-arming the whole thing. And the handle did not look like a way
+ * out: it kept the panel's own glyph whether the panel was open or shut.
+ *
+ * So this asserts the round trip, and that the thing under the handle is the
+ * handle. `elementFromPoint` is the assertion that matters — the attribute can
+ * flip while the control is untouchable, which is precisely what shipped.
+ */
+console.log('\nthe way back out — a panel opens and closes again');
+{
+  const via = await browser.newPage();
+  const viaErrors = [];
+  via.on('pageerror', (e) => viaErrors.push(String(e)));
+  await via.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+  await via.goto(pathToFileURL(resolve(page$)).href, { waitUntil: 'load', timeout: 60000 });
+  await ready(via, 'panel');
+  await settle(1600);
+
+  const viaCdp = await via.createCDPSession();
+  const at = (sel) => via.evaluate((q) => {
+    const n = document.querySelector(q);
+    if (!n) return null;
+    const r = n.getBoundingClientRect();
+    return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+  }, sel);
+  const state = (k) => via.evaluate((key) =>
+    document.getElementById('sheet').getAttribute(`data-panel-${key}`), k);
+  const topmost = (pt) => via.evaluate(({ x, y }) => {
+    const el = document.elementFromPoint(x, y);
+    return el ? (el.closest('[id]')?.id ?? el.tagName.toLowerCase()) : 'nothing';
+  }, pt);
+  const press = async (pt) => {
+    await viaCdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...pt, id: 1 }] });
+    await viaCdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await settle(700);
+  };
+
+  const shutHandle = await at('#key > h2 .panelToggle');
+  await press(shutHandle);
+  ok(await state('key') === 'open', 'pressing the handle opens the panel');
+
+  const openHandle = await at('#key > h2 .panelToggle');
+  const over = await topmost(openHandle);
+  ok(over === 'key', 'and the handle is still the thing under your finger',
+    `topmost element belongs to #${over}`);
+
+  await press(openHandle);
+  ok(await state('key') === 'shut', 'pressing it again closes the panel');
+
+  const glyphs = await via.evaluate(() => {
+    const b = document.querySelector('#key > h2 .panelToggle');
+    const shut = b.innerHTML;
+    window.__B2D__.setPanel('key', true);
+    return { differs: b.innerHTML !== shut, label: b.getAttribute('aria-label') };
+  });
+  ok(glyphs.differs, 'an open panel shows a different glyph from a shut one',
+    `aria-label "${glyphs.label}"`);
+
+  /*
+     A drawer, not a takeover.
+
+     The reported complaint had two halves — it could not be closed, and it
+     filled the screen. This is the second: an open panel rises from the bottom
+     edge and the drawing is re-framed into the band left above it, so the
+     subject is still there to look at while the legend is read.
+  */
+  // Stated, not toggled: the glyph probe above left it open, and pressing the
+  // handle here would have closed it — which is what the first version of this
+  // block did, then measured a folded handle and reported the drawer as 5% tall.
+  await via.evaluate(() => window.__B2D__.setPanel('key', true));
+  await settle(900);
+  const band = await via.evaluate(() => {
+    const B = window.__B2D__;
+    const [mn, mx] = B.fitBoxes().rest;
+    const V = B.stage.camera.position.constructor;
+    const ys = [];
+    for (const x of [mn[0], mx[0]]) for (const y of [mn[1], mx[1]]) for (const z of [mn[2], mx[2]]) {
+      const v = new V(x, y, z); v.project(B.stage.camera);
+      ys.push((-v.y * 0.5 + 0.5) * innerHeight);
+    }
+    const d = document.getElementById('key').getBoundingClientRect();
+    const item = document.querySelector('#key .item .tx');
+    return {
+      modelTop: Math.round(Math.min(...ys)), modelBottom: Math.round(Math.max(...ys)),
+      drawerTop: Math.round(d.top), drawerH: Math.round(d.height), vh: innerHeight,
+      itemPx: item ? parseFloat(getComputedStyle(item).fontSize) : 0,
+      scrim: getComputedStyle(document.getElementById('scrim')).display,
+    };
+  });
+  ok(band.drawerTop > band.vh * 0.2, 'an open panel is a drawer, not the whole sheet',
+    `top ${band.drawerTop} of ${band.vh}, ${Math.round(band.drawerH / band.vh * 100)}% tall`);
+  ok(band.modelBottom <= band.drawerTop, 'and the drawing is re-framed clear of it',
+    `model ends ${band.modelBottom}, drawer starts ${band.drawerTop}`);
+  ok(band.itemPx >= 12.5, 'its text is legible on a phone', `${band.itemPx}px`);
+
+  // Tapping the drawing rather than the drawer means "put this away", not
+  // "orbit" — which is what it meant before the scrim existed.
+  ok(band.scrim === 'block', 'a press outside has something to land on');
+  await press({ x: 195, y: 150 });
+  ok(await state('key') === 'shut', 'pressing outside the drawer closes it');
+
+  ok(viaErrors.length === 0, 'nothing threw', viaErrors.slice(0, 2).join(' | '));
+  await via.close();
+}
+
+/* ------------------------------------------------------------- the rail */
+
+/*
+ * Also reported: the row of view buttons ran off the screen with no way to
+ * reach the far end. The wide layout sizes the console to `max-content` so auto
+ * margins can centre it; left as that on a phone it grows to fit all eleven
+ * buttons, and a box as wide as its content has no overflow for `overflow-x`
+ * to scroll. Both halves are asserted — clipped by the screen, AND scrollable.
+ */
+console.log('\nthe rail — every control reachable on a narrow screen');
+{
+  const rail = await page.evaluate(() => {
+    const c = document.getElementById('console');
+    const r = c.getBoundingClientRect();
+    const row = (name) => {
+      const el = c.querySelector(`.railRow[data-row="${name}"]`);
+      const sc = el.querySelector('.rail');
+      return { at: el.getAttribute('data-scroll'), content: sc.scrollWidth, fits: sc.clientWidth };
+    };
+    return {
+      right: Math.round(r.right), vw: innerWidth,
+      rows: c.querySelectorAll('.railRow').length,
+      views: row('view'),
+      rest: row('rest'),
+      viewBtns: c.querySelectorAll('[data-group="view"] .btn').length,
+      langInConsole: !!c.querySelector('#langDock, .lang'),
+    };
+  });
+
+  ok(rail.right <= rail.vw, 'the toolbar is clipped by the screen, not spilling past it',
+    `right edge ${rail.right} of ${rail.vw}`);
+
+  /*
+     Two rows, and the views own the first.
+
+     The reason is a measurement: the view buttons come to about 345px and a
+     phone leaves about 356px, so on their own they fit and the control reached
+     for most never has to be scrolled to. That fit is NOT asserted — it depends
+     on how many views a spec declares and `spec.views` has no length limit — so
+     what is checked is that they have the row, and the width is reported for
+     whoever reads the log.
+  */
+  ok(rail.rows === 2, 'the toolbar is two rows here', `${rail.rows} row(s)`);
+  ok(rail.views.content <= rail.views.fits + 1
+    ? true
+    : rail.views.at !== 'none',
+    'the views have a row to themselves',
+    rail.views.content <= rail.views.fits + 1
+      ? `${rail.viewBtns} views in ${rail.views.content}px — fits, no scrolling`
+      : `${rail.viewBtns} views in ${rail.views.content}px of ${rail.views.fits}px — scrolls, with arrows`);
+
+  ok(rail.rest.content > rail.rest.fits, 'and the rest scrolls, so its far end is reachable',
+    `${rail.rest.content}px of content in ${rail.rest.fits}px`);
+
+  ok(!rail.langInConsole, 'language is not in the toolbar');
+
+  /*
+     And each row says which way there is more, on its own.
+
+     Both rows share one mechanism but not one state: the views usually report
+     `none` while the row under them is mid-scroll, and an arrow on the wrong
+     row is as misleading as an arrow pointing nowhere.
+  */
+  const arrows = async (scrollTo) => {
+    await page.evaluate((x) => {
+      const r = document.querySelector('.railRow[data-row="rest"] .rail');
+      r.scrollLeft = x === 'end' ? r.scrollWidth : x;
+    }, scrollTo);
+    await settle(400);
+    return page.evaluate(() => {
+      const el = document.querySelector('.railRow[data-row="rest"]');
+      const shown = (edge) => {
+        const n = el.querySelector(`.railEdge[data-edge="${edge}"]`);
+        return !!n && getComputedStyle(n).display !== 'none';
+      };
+      return { at: el.getAttribute('data-scroll'), start: shown('start'), end: shown('end') };
+    });
+  };
+
+  const atStart = await arrows(0);
+  ok(atStart.at === 'start' && !atStart.start && atStart.end,
+    'at the near end it points onward only', JSON.stringify(atStart));
+
+  const inMiddle = await arrows(Math.round((rail.rest.content - rail.rest.fits) / 2));
+  ok(inMiddle.at === 'middle' && inMiddle.start && inMiddle.end,
+    'in the middle it points both ways', JSON.stringify(inMiddle));
+
+  const atEnd = await arrows('end');
+  ok(atEnd.at === 'end' && atEnd.start && !atEnd.end,
+    'at the far end it points back only', JSON.stringify(atEnd));
+
+  ok(await page.evaluate(() => {
+    const a = document.querySelector('.railEdge');
+    return getComputedStyle(a).pointerEvents === 'none';
+  }), 'and never swallows a press meant for the button beneath it');
+
+  await arrows(0);
+}
+
+/* ------------------------------------------------------------- language */
+
+/*
+ * Language left the toolbar because it is a different kind of control: every
+ * other button changes what you are looking at, this changes what it is written
+ * in. It names the language you would GET — a button reading 中文 while Chinese
+ * is already on screen says nothing about what pressing it does.
+ */
+console.log('\nlanguage — docked, and named by where it takes you');
+{
+  const dock = await page.evaluate(() => {
+    const d = document.getElementById('langDock');
+    // The cycling form is the one this width shows; the per-language buttons
+    // are built too and hidden here. See `#langDock` in the stylesheet.
+    const b = d?.querySelector('.langCycle .btn');
+    const r = d?.getBoundingClientRect();
+    return b
+      ? { label: b.textContent.trim(), x: Math.round(r.x), y: Math.round(r.y), vw: innerWidth }
+      : null;
+  });
+  if (!dock) {
+    ok(true, 'this sheet carries one language, so there is nothing to dock');
+  } else {
+    const was = await page.evaluate(() => window.__B2D__.locale);
+    ok(dock.x + 20 > dock.vw / 2, 'it sits with the panel handles, not in the toolbar',
+      `at ${dock.x},${dock.y} of ${dock.vw} wide`);
+
+    ok(await page.evaluate(() => {
+      const all = document.querySelector('#langDock .langAll');
+      const one = document.querySelector('#langDock .langCycle');
+      return getComputedStyle(all).display === 'none'
+        && getComputedStyle(one).display !== 'none';
+    }), 'and shows the single cycling form, not one button per language');
+
+    await page.evaluate(() => document.querySelector('#langDock .langCycle .btn').click());
+    await settle(700);
+    const after = await page.evaluate(() => ({
+      locale: window.__B2D__.locale,
+      label: document.querySelector('#langDock .langCycle .btn').textContent.trim(),
+    }));
+    ok(after.locale !== was, 'pressing it changes the language', `${was} -> ${after.locale}`);
+    ok(after.label !== dock.label, 'and it then names the way back',
+      `"${dock.label}" -> "${after.label}"`);
+    await page.evaluate((c) => window.__B2D__.setLocale(c), was);
+    await settle(500);
+  }
+}
+
 /* --------------------------------------------------- numbering and framing */
 
 /*
@@ -399,7 +679,7 @@ console.log('\na narrow window with a mouse — where the two layout opinions me
   // Deliberately NOT hasTouch: this pointer hovers.
   await narrow.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await narrow.goto(pathToFileURL(resolve(page$)).href, { waitUntil: 'load', timeout: 60000 });
-  await narrow.waitForFunction('window.__B2D__ && window.__B2D__.ready', { timeout: 30000 });
+  await ready(narrow, 'narrow-window');
   await new Promise((r) => setTimeout(r, 1400));
 
   let card = null;

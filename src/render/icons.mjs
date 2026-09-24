@@ -402,6 +402,10 @@ const UI_GLYPH = {
   close: '<path d="M6 6 18 18 M18 6 6 18" stroke="currentColor" stroke-width="1.9"'
     + ' stroke-linecap="round"/>',
 
+  // Points the way along a rail that has more on it than fits.
+  chevron: '<path d="M9.5 4.8 16.7 12 9.5 19.2" stroke="currentColor" stroke-width="2.2"'
+    + ' stroke-linecap="round" stroke-linejoin="round"/>',
+
   // what the pointer does here
   help: '<circle cx="12" cy="12" r="8.8" stroke="currentColor" stroke-width="1.5"/>'
     + '<path d="M9.4 9.6a2.7 2.7 0 1 1 3.4 2.6v1.6" stroke="currentColor" stroke-width="1.6"'

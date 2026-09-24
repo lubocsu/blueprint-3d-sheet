@@ -227,7 +227,7 @@ const chrome = buildChrome(sheet, spec, {
    * panels, so the layout is now wrong and has to be re-solved — which is
    * exactly what `bump` asks for, and `solve` re-measures the panels itself.
    */
-  onPanel: () => { syncCallouts(); annotations.bump(); },
+  onPanel: () => { syncCallouts(); syncViewOffset(); annotations.bump(); },
 });
 
 /**
@@ -240,6 +240,16 @@ const chrome = buildChrome(sheet, spec, {
  * running down behind it to parts nobody can see. There is nothing to point at,
  * so it points at nothing.
  */
+/**
+ * Tell the camera what an open drawer is covering, so the drawing is framed
+ * into the band that is left instead of behind it. Nothing to do on a wide
+ * sheet, where a panel sits beside the drawing rather than over it.
+ */
+function syncViewOffset() {
+  const { top, bottom } = chrome.safeArea();
+  viewCtl.setSafeArea(top, bottom);
+}
+
 function syncCallouts() {
   const shown = chrome.layerOn('callouts') && !chrome.panelsOverlaying;
   annotations.setCalloutsVisible(shown);
@@ -301,8 +311,16 @@ function setPartHot(id, hot) {
   }
 }
 
+/**
+ * When the reader last moved the picture — see `BUSY_MS`. `onActivity` fires
+ * from the orbit, the pinch and the wheel and from nothing else, which is
+ * exactly the distinction the panels need and the annotation clock does not
+ * draw.
+ */
+let lastManipulation = -1e9;
+
 const interaction = createInteraction(canvas, stage.camera, viewCtl, pickables, {
-  onActivity: () => annotations.bump(),
+  onActivity: () => { lastManipulation = performance.now(); annotations.bump(); },
   onHover: (id, prev) => {
     if (prev) setPartHot(prev, false);
     hoveredPart = id;
@@ -333,7 +351,10 @@ function resize() {
   // which panels a layout opens with differs on either side of one. Panels the
   // reader has decided about are left alone — see `applyPanelDefaults`.
   chrome.applyPanelDefaults();
+  chrome.paintRail();
   syncCallouts();
+  // A resize can cross the breakpoint where panels stop being drawers.
+  syncViewOffset();
   annotations.refreshAvoid();
   annotations.bump();
 }
@@ -343,12 +364,20 @@ resize();
 /* ------------------------------------------------------------------ mainloop */
 
 /**
- * How far the annotation layer has to have faded before the panels follow it
- * out. Read off the same opacity, so one number decides how eager the sheet is
- * to get out of the reader's way — low enough that a drag clears the glass
- * almost at once, high enough that a stray wheel click does not flash them.
+ * How long after the last manipulation the panels stay out of the way.
+ *
+ * This used to be read off the annotation layer's opacity, on the reasoning
+ * that both mean "the picture is moving". They do not. That opacity drops on
+ * every `bump()` — a view switch, a motion, a layer toggle, and a PANEL
+ * toggle — so opening a panel hid the panel that had just been opened, and on
+ * a phone, where an open panel covers the drawing, the tap meant to close it
+ * went through to the canvas instead and re-armed the whole thing. The sheet
+ * could not be got out of.
+ *
+ * So it is its own clock now, stamped only by actual manipulation — a drag, a
+ * pinch, a wheel — plus the view tweens those start.
  */
-const BUSY_AT = 0.72;
+const BUSY_MS = 520;
 
 let last = performance.now();
 let elapsed = 0;
@@ -380,12 +409,8 @@ function tick(now) {
   annotations.update(window.innerWidth, window.innerHeight, dt);
   dimensions.update(window.innerWidth, window.innerHeight, annotations.opacity);
 
-  // The panels step aside for exactly as long as the annotation layer does.
-  // Not a second clock: the annotation fade already means "the picture is
-  // moving", which is the same question the panels are asking, and two timers
-  // that nearly agree would show up as the panels and the balloons leaving at
-  // different moments.
-  chrome.setBusy(annotations.opacity < BUSY_AT);
+  // Moving the picture, or a view tween still carrying one out.
+  chrome.setBusy(now - lastManipulation < BUSY_MS || viewCtl.tweening);
   chrome.updateInstruments(scope);
   chrome.showCard(hoveredPart ? partById.get(hoveredPart) : null,
                   interaction.pointer.x, interaction.pointer.y);

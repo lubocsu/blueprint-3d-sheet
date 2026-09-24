@@ -122,8 +122,13 @@ jobs:
       # A touchscreen is the one input nobody here has while reviewing, and the
       # way it breaks is silent: a wrong `touch-action` leaves the desk working
       # perfectly and pinch doing nothing.
+      # Both subjects: the tank is four times longer than it is tall and the
+      # engine is nearly cubic, which frames differently inside the band a
+      # drawer leaves — and the drawer framing is measured here.
       - name: Touch gestures, on a phone-sized viewport
-        run: node dev/touch-check.mjs out/mbt-mk6/index.html
+        run: |
+          node dev/touch-check.mjs out/mbt-mk6/index.html
+          node dev/touch-check.mjs out/radial-engine/index.html
 
       - uses: actions/upload-artifact@v7
         if: always()
