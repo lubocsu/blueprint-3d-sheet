@@ -61,7 +61,7 @@ function die(msg) {
 }
 
 function report(spec, { strict }) {
-  const structural = validateSpec(spec);
+  const structural = validateSpec(spec, { strict });
   if (!structural.ok) {
     console.error(C.red(`\n✗ ${structural.errors.length} schema/semantic error(s):`));
     for (const e of structural.errors) console.error('  ' + e);

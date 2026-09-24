@@ -7,3 +7,10 @@ site/
 # Reference material is local evidence only — never distributed.
 *.mp4
 dev/*.bundle.js
+
+# Some agent tooling writes an AGENTS.md next to CLAUDE.md, restating what is
+# already in it. The conventions this repository actually keeps live in
+# CLAUDE.md and are version-controlled there; a generated copy alongside it
+# would be a second source that drifts, and it turns up as an untracked file in
+# every session until someone sweeps it in by accident.
+AGENTS.md
