@@ -125,8 +125,12 @@
         "path": [[0, -180, 0], [0, 0, 40], [0, 180, 90], [0, 330, 96]] },
       "transform": { "pos": [0, 130, -70] },
       "instances": { "pattern": "radial", "count": 9, "axis": "y", "radius": 300, "orient": true },
-      "channels": [{ "type": "flow", "bind": "fuel",
-        "path": [[0, -180, 0], [0, 0, 40], [0, 180, 90], [0, 330, 96]] }] },
+      "channels": [
+        { "type": "flow", "bind": "fuel",
+          "path": [[0, -180, 0], [0, 0, 40], [0, 180, 90], [0, 330, 96]] },
+        { "type": "flow", "bind": "prime",
+          "path": [[44, -150, 4], [44, 10, 46], [44, 190, 90], [12, 300, 96], [0, 344, 94]] }
+      ] },
 
     { "id": "cyl.exhaust", "name": "EXHAUST STUB", "group": "exhaust",
       "note": "Short stack, collector ring deleted on this mark; 9 off",
