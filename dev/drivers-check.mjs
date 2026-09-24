@@ -23,6 +23,10 @@
  * Only the first is an error under --strict, because only the first lies to
  * whoever is looking at the sheet.
  *
+ * The declaration itself is checked here too: validate and normalize have to
+ * agree about what an unwritten `init` is, or validate rejects specs that build
+ * and run perfectly well.
+ *
  *   node dev/drivers-check.mjs
  */
 
@@ -168,6 +172,32 @@ console.log('\nan assembly-wide explode reads its driver without naming it in a 
   }));
   ok(!typo.ok && typo.errors.some((m) => m.includes('/explode') && m.includes('"aprat"')),
     'and a typo in it is an error rather than a silently inert explode');
+}
+
+/* ------------------------------------------------- the range and the init */
+
+console.log('\nan init nobody wrote is the one normalize will supply');
+{
+  // validate used to default it to a bare 0 while normalize clamps 0 into the
+  // range, so a driver whose range excludes zero was rejected out of hand — for
+  // a spec that builds, and runs with init at the bottom of its own range.
+  const rpm = validateSpec(base({ drivers: [{ id: 'rpm', min: 600, max: 2600 }] }));
+  ok(rpm.ok, 'a range that does not contain zero is not an error', JSON.stringify(rpm.errors));
+
+  const negative = validateSpec(base({ drivers: [{ id: 'x', min: -5, max: -1 }] }));
+  ok(negative.ok, 'nor is a range entirely below zero');
+
+  // The check still has to fire on an init the author really did get wrong.
+  const wrong = validateSpec(base({ drivers: [{ id: 'y', min: 0, max: 1, init: 3 }] }));
+  ok(!wrong.ok && wrong.errors.some((m) => m.includes('init 3 outside [0, 1]')),
+    'an init the author wrote out of range is still an error');
+
+  // An inverted range used to report twice: once for the range, once for an
+  // init nobody wrote and that the range could not have contained anyway.
+  const inverted = validateSpec(base({ drivers: [{ id: 'a', min: 5 }] }));
+  ok(inverted.errors.length === 1 && inverted.errors[0].includes('min 5 must be < max 1'),
+    'an inverted range is reported once, without a phantom init error',
+    inverted.errors.join(' / '));
 }
 
 if (failures) {

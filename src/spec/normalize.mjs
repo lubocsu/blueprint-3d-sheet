@@ -169,6 +169,19 @@ function worldPos(part, byId) {
   return [f.p[0] + c[0], f.p[1] + c[1], f.p[2] + c[2]];
 }
 
+/**
+ * A driver's range and starting value as normalize will fill them in.
+ *
+ * Validation needs the same answer — an unauthored `init` defaults to the
+ * nearest in-range value, not a bare 0 — so the rule lives here once instead of
+ * being restated wherever a driver is read.
+ */
+export function driverDefaults(d) {
+  const min = d.min ?? 0;
+  const max = d.max ?? 1;
+  return { min, max, init: d.init ?? Math.min(Math.max(0, min), max) };
+}
+
 export function normalizeSpec(input) {
   const spec = clone(input);
 
@@ -204,9 +217,7 @@ export function normalizeSpec(input) {
   // ---- drivers --------------------------------------------------------------
   spec.drivers ??= [];
   for (const d of spec.drivers) {
-    d.min ??= 0;
-    d.max ??= 1;
-    d.init ??= Math.min(Math.max(0, d.min), d.max);
+    Object.assign(d, driverDefaults(d));
     d.ease ??= 2;
     d.wrap ??= false;
   }
